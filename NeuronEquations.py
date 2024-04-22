@@ -1,10 +1,10 @@
 EQ_LIF = '''
-dv/dt = -(v - I/gL) / tau                                                           : volt (unless refractory)
+dv/dt = -(v - I/gL) / tau                                                        : volt (unless refractory)
 X                                                                                : 1 
 Y                                                                                : 1
-I = I_GABA + I_AMPA: volt/second                                                 # total input current - GABA, Inhibitory and AMPA, Excitatory
-I_GABA = K_GABA * Ig : volt/second
-I_AMPA = K_AMPA * Ia : volt/second
+I = I_GABA + I_AMPA                                                              : volt/second # total input current - GABA, Inhibitory and AMPA, Excitatory
+I_GABA = K_GABA * Ig                                                             : volt/second
+I_AMPA = K_AMPA * Ia                                                             : volt/second
 dIg/dt = (-Ig+Ig1)/taugd                                                         : volt/second
 dIa/dt = (-Ia+Ia1)/tauad                                                         : volt/second
 dIg1/dt = -Ig1/taugr                                                             : volt/second
