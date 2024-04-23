@@ -1,6 +1,9 @@
 from brian2 import *
 import cv2
-import time
+import sys
+
+
+# TODO : Validate the documentation of the functions
 
 ''' - EVENT CAMERA HANDLING FUNCTIONS -
 List of functions to handle the event camera data and adapt it to the simulation requirements.
@@ -10,32 +13,159 @@ Event data is considered to be of the form (x, y, t, p) where x and y are the pi
     - event_camera_to_spikes(event_camera_data, threshold, time_window)
     - event_camera_to_spikes_with_time(event_camera_data, threshold, time_window)
 '''
+# Make sure the data is valid to be used in the simulation - used in the event_to_spike() function
+def validate_indices(indices, firing_x, firing_y, width):
+    """
+    Reverse the operation of building the indices array and check if the reconstructed values match the original values.
 
-def event_to_spike(eventStream, height, width):
+    Parameters:
+    - indices (array): The indices array.
+    - firing_x (array): The array of x coordinates.
+    - firing_y (array): The array of y coordinates.
+    - width (int): The width of the event camera.
+
+    Returns:
+    None
+    """
+    # Reverse the operation
+    reconstructed_y = indices % width
+    reconstructed_x = indices // width
+
+    # Check if the reconstructed values match the original values
+    if np.all(reconstructed_x == firing_x) and np.all(reconstructed_y == firing_y):
+        print("Indices array was built correctly.")
+    else:
+        print("Indices array was not built correctly.")
+
+def sort_events(events: list):
+    """
+    Sorts a list of events based on their times and indices.
+
+    Args:
+        events (list): A list of events, where each event is a tuple containing a
+        time and an index in that respective order.
+
+    Returns:
+        tuple: A tuple containing two lists - sorted times and sorted indices.
+    """
+    # Sort the events first by time, then by index
+    sorted_events = sorted(events, key=lambda x: (x[0], x[1]))
+    # Unzip the sorted events back into separate lists
+    sorted_times, sorted_indices = zip(*sorted_events)
+    return sorted_times, sorted_indices
+
+# Check for duplicate firing times and neuron indices
+# XXX: Consider making the process by default and just extract the unique (Neuron Index-Time) pairs from the set
+# XXX: Consider using np.unique() to extract the unique pairs (not sure if it is more efficient)
+def clear_duplicates(times, indices):
+    """
+    Check for and remove duplicate pairs of times and neuron indices.
+
+    This function takes in two lists, `times` and `indices`, and checks for duplicate pairs of time values and neuron indices.
+    If any duplicate pairs are found, they are removed from the lists.
+
+    Parameters:
+    times (list): A list of time values.
+    indices (list): A list of neuron indices.
+
+    Returns:
+    tuple: A tuple containing the updated lists of times and indices.
+
+    Notes:
+    - This function sorts the pairs of times and indices according to the sorting method in the `sort_events` function.
+    """
+    
+    print("Checking for duplicate pairs...")
+    pairs = list(zip(times, indices))
+    pairs_set = list(set(pairs))
+
+    if len(pairs) != len(pairs_set):
+        print("Duplicate pairs found. Total Number of duplicates: ", len(pairs) - len(pairs_set))
+        print("Total number of pairs/spikes prior to removing duplicates: ", len(pairs))
+        print("Removing duplicate pairs...")
+        print("Done. Total number of pairs/spikes: ", len(pairs_set), " pairs.")
+        sorted_times, sorted_indices = sort_events(pairs_set)
+        return sorted_times, sorted_indices
+    else:
+        print("No duplicate pairs found.")
+        sorted_times, sorted_indices = sort_events(pairs_set)
+        return sorted_times, sorted_indices
+
+# TODO: Implement the function
+def nudge_ts(ts, nudge=1e-6):
+    return None
+
+# Convert the event camera data to spikes
+# XXX: Make it take the keys as arguments or even consider taking x, y, t, p as arguments
+# XXX: make sure the time units make sense. Right now it is arbitrarily in ms. I'm not even sure if it is in ms.
+def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear_dup=True):
     """
     Converts an event to a spike based on the threshold.
 
     Parameters:
-    - eventStream (dictionary): The event stream data. The keys are 'x', 'y', 't', and 'p'.
+    - eventStream (dictionary): The event stream data. The keys are 'x', 'y', 'ts', and 'p'.
                                 The values are lists of the respective data.
                                 'x' and 'y' are the pixel coordinates (integers)
-                                't' is the time (float)
-                                'p' is the polarity (boolean)
-                                
+                                'ts' is the time (float)
+                                'pol' is the polarity (boolean)
+    - height (int): The height of the event camera.
     - width (int): The width of the event camera.
+    - dt (float, optional): The time resolution of the spike generator. Defaults to None.
+    - val_indices (bool, optional): Flag to validate indices. Defaults to False.
+    - clear_dup (bool, optional): Flag to clear duplicate events. Defaults to True.
 
     Returns:
+    - simTime (float*ms): The recommended simulation time that spans all spike times.
+    - clockStep (float*ms): The recommended clock time step based on the minimum time difference between events.
     - spikeGen (SpikeGeneratorGroup): The SpikeGeneratorGroup object respective to the event stream.
     """
-    N=height*width
     
-    firing_x = eventStream['x'][eventStream['p']]
-    firing_y = eventStream['y'][eventStream['p']]
+    N = height * width
     
-    indices = array([firing_y[i] + firing_x[i]*width for i in range(N)])
-    times = array(eventStream['t'][eventStream['p']])
+    # Retrieve the x, y, time, and polarity data from the event stream
+    # NOTE: The time extracted from the event stream is in seconds.
+    #       It is converted into milliseconds post processing.
+    firing_x = eventStream['x'][eventStream['pol']]
+    firing_y = eventStream['y'][eventStream['pol']]
+    times = eventStream['ts'][eventStream['pol']]
+        
+    print(f'The maximum x index {np.max(firing_x)} while the width is {width}')
+    print(f'The maximum y index {np.max(firing_y)} while the height is {height}')
     
-    return SpikeGeneratorGroup(N, indices, times*ms)
+    # Check if the data is correct
+    if len(firing_x) == len(firing_y) == len(times):
+        print("The x,y and time stamp indices are equal, the data is correct.")
+        indices = array([firing_y[i] + firing_x[i]*width for i in range(len(times))])
+    else:
+        print("The x,y and time stamp indices are not equal, the data is incorrect.")
+        return None
+    
+    if val_indices:
+        validate_indices(indices, firing_x, firing_y, width)
+        
+    if clear_dup:
+        times, indices = clear_duplicates(times, indices)
+    else:
+        times, indices = sort_events(list(zip(times, indices)))
+    
+    times = times*1e3 # Convert the time from seconds to milliseconds
+
+    # Calculate the simulation time as the ceil of the last spike time
+    maxTime = times[-1]
+    print(f'The maximum time stamp {maxTime}')
+    simTime = np.ceil(times[-1])
+    print(f'The recommended simulation time is {simTime}')
+    
+    # Calculate the (defaultClock.dt) time step as the floor of the min
+    minTimeStep = min(abs(diff(list(set(times)))))
+    print(f'The minimum time step is {minTimeStep}')
+    clockStep = np.floor(minTimeStep)
+    print(f'The recommended clock time step is {clockStep}')
+    
+    return simTime*ms, clockStep*ms, SpikeGeneratorGroup(N, indices, times*ms, dt)
+
+
+
 
 
 ''' - NETWORK VISUALIZATION FUNCTIONS -
@@ -46,9 +176,8 @@ List of functions to visualize the network architecture, neuron states, spikes, 
     - visualise_neurons_states(stateMonitor, neuron_indices, states)
     - visualise_spikes(spikeMonitorsList, figTitle='')
     - visualise_interSpikeInterval(spikeMonitor, neuron_indices)
-    
 '''
-
+# BUG: This function is not correctly implemented. Need to either modify the code or the arguments to make it work.
 # Visualize the connectivity
 def visualise_connectivity(SynapsesGroup, figSize=(10, 4)):
     """
@@ -157,6 +286,8 @@ def visualise_interSpikeInterval(spikeMonitor, neuron_indices ,figSize=(10, 5)):
 
 
 
+
+
 ''' - VIDEO AND IMAGE GENERATION FUNCTIONS -
 List of functions to generate image frames from the spike monitors of the input and output layers
     and generate a binary video from the frames
@@ -164,9 +295,7 @@ List of functions to generate image frames from the spike monitors of the input 
     The functions are:
     - generate_InOut_frames(inSpikeMon, outSpikeMon, heightIn, widthIn, heightOut, widthOut, num_neurons)
     - generate_binary_video(frames, output_path)
-    
 '''
-
 # Generate image frames from the spike monitors of the input and output layers 
 def generate_InOut_frames(inSpikeMon, outSpikeMon, heightIn, widthIn, heightOut, widthOut, num_neurons):
     """
@@ -232,3 +361,28 @@ def generate_binary_video(frames, output_path):
 
     # Release the VideoWriter object
     out.release()
+
+
+
+
+
+''' - MISCELLANEOUS -'''
+class ProgressBar(object):
+    def __init__(self, toolbar_width=40):
+        self.toolbar_width = toolbar_width
+        self.ticks = 0
+
+    def __call__(self, elapsed, complete, start, duration):
+        if complete == 0.0:
+            # setup toolbar
+            sys.stdout.write("[%s]" % (" " * self.toolbar_width))
+            sys.stdout.flush()
+            sys.stdout.write("\b" * (self.toolbar_width + 1)) # return to start of line, after '['
+        else:
+            ticks_needed = int(round(complete * self.toolbar_width))
+            if self.ticks < ticks_needed:
+                sys.stdout.write("-" * (ticks_needed-self.ticks))
+                sys.stdout.flush()
+                self.ticks = ticks_needed
+        if complete == 1.0:
+            sys.stdout.write("\n")

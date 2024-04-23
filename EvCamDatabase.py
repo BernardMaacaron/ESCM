@@ -1,0 +1,1 @@
+DAVIS_346B = {'width': 346, 'height': 260}
