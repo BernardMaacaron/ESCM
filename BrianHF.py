@@ -2,8 +2,9 @@ from brian2 import *
 import cv2
 import sys
 
-
+# NOTE: The following comments are longterm TODOs and are not urgent. They are just suggestions for future improvements.
 # TODO : Validate the documentation of the functions
+# TODO : Turn the conditionals into exceptions
 
 ''' - EVENT CAMERA HANDLING FUNCTIONS -
 List of functions to handle the event camera data and adapt it to the simulation requirements.
@@ -28,8 +29,8 @@ def validate_indices(indices, firing_x, firing_y, width):
     None
     """
     # Reverse the operation
-    reconstructed_y = indices % width
-    reconstructed_x = indices // width
+    reconstructed_y = indices // width
+    reconstructed_x = indices % width
 
     # Check if the reconstructed values match the original values
     if np.all(reconstructed_x == firing_x) and np.all(reconstructed_y == firing_y):
@@ -49,6 +50,7 @@ def sort_events(events: list):
         tuple: A tuple containing two lists - sorted times and sorted indices.
     """
     # Sort the events first by time, then by index
+    
     sorted_events = sorted(events, key=lambda x: (x[0], x[1]))
     # Unzip the sorted events back into separate lists
     sorted_times, sorted_indices = zip(*sorted_events)
@@ -81,7 +83,7 @@ def clear_duplicates(times, indices):
 
     if len(pairs) != len(pairs_set):
         print("Duplicate pairs found. Total Number of duplicates: ", len(pairs) - len(pairs_set))
-        print("Total number of pairs/spikes prior to removing duplicates: ", len(pairs))
+        print("Total number of pairs/spikes prior to removing duplicates: ", len(pairs), " pairs.")
         print("Removing duplicate pairs...")
         print("Done. Total number of pairs/spikes: ", len(pairs_set), " pairs.")
         sorted_times, sorted_indices = sort_events(pairs_set)
@@ -123,7 +125,7 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
     N = height * width
     
     # Retrieve the x, y, time, and polarity data from the event stream
-    # NOTE: The time extracted from the event stream is in seconds.
+    # NOTE: The time extracted from the event stream is in seconds (Read bimvee library documentation).
     #       It is converted into milliseconds post processing.
     firing_x = eventStream['x'][eventStream['pol']]
     firing_y = eventStream['y'][eventStream['pol']]
@@ -135,7 +137,7 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
     # Check if the data is correct
     if len(firing_x) == len(firing_y) == len(times):
         print("The x,y and time stamp indices are equal, the data is correct.")
-        indices = array([firing_y[i] + firing_x[i]*width for i in range(len(times))])
+        indices = array([firing_y[i]*width + firing_x[i] for i in range(len(times))])
     else:
         print("The x,y and time stamp indices are not equal, the data is incorrect.")
         return None
@@ -147,8 +149,8 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
         times, indices = clear_duplicates(times, indices)
     else:
         times, indices = sort_events(list(zip(times, indices)))
-    
-    times = times*1e3 # Convert the time from seconds to milliseconds
+    # Convert the time from seconds to milliseconds
+    times = np.array(times) * 1000
 
     # Calculate the simulation time as the ceil of the last spike time
     maxTime = times[-1]
@@ -156,13 +158,13 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
     simTime = np.ceil(times[-1])
     print(f'The recommended simulation time is {simTime}')
     
-    # Calculate the (defaultClock.dt) time step as the floor of the min
+    # Calculate the (defaultClock.dt) time step as the floor of the smallest time difference between events
     minTimeStep = min(abs(diff(list(set(times)))))
-    print(f'The minimum time step is {minTimeStep}')
-    clockStep = np.floor(minTimeStep)
+    print(f'The minimum time step is {minTimeStep}')    
+    clockStep =  round(minTimeStep, decimal_index(minTimeStep))
     print(f'The recommended clock time step is {clockStep}')
     
-    return simTime*ms, clockStep*ms, SpikeGeneratorGroup(N, indices, times*ms, dt)
+    return simTime*ms, clockStep*ms, SpikeGeneratorGroup(N, indices, times*ms, dt, sorted=True)
 
 
 
@@ -367,6 +369,21 @@ def generate_binary_video(frames, output_path):
 
 
 ''' - MISCELLANEOUS -'''
+def decimal_index(num):
+    """
+    Returns the index of the first decimal place in a given number.
+    
+    Parameters:
+    num (float): The number for which the decimal index needs to be calculated.
+    
+    Returns:
+    int: The index of the first decimal place in the given number.
+         Returns 0 if the number is 0.
+    """
+    if num == 0:
+        return 0
+    return int(np.abs(np.floor(np.log10(np.abs(num)))))
+
 class ProgressBar(object):
     def __init__(self, toolbar_width=40):
         self.toolbar_width = toolbar_width

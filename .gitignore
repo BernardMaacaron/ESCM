@@ -17266,3 +17266,6 @@ MVSEC_short_outdoor/leftdvs/data.log
 MVSEC_short_outdoor/leftdvs/info.log
 MVSEC_short_outdoor/rightdvs/data.log
 MVSEC_short_outdoor/rightdvs/info.log
+__pycache__/EVC.cpython-310.pyc
+__pycache__/EvCamDatabase.cpython-310.pyc
+__pycache__/EVCD.cpython-310.pyc
