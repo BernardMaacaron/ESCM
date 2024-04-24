@@ -100,7 +100,7 @@ def nudge_ts(ts, nudge=1e-6):
 # Convert the event camera data to spikes
 # XXX: Make it take the keys as arguments or even consider taking x, y, t, p as arguments
 # XXX: make sure the time units make sense. Right now it is arbitrarily in ms. I'm not even sure if it is in ms.
-def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear_dup=True):
+def event_to_spike(eventStream, width, height, dt= None , val_indices=False, clear_dup=True):
     """
     Converts an event to a spike based on the threshold.
 
@@ -164,7 +164,10 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
     clockStep =  round(minTimeStep, decimal_index(minTimeStep))
     print(f'The recommended clock time step is {clockStep}')
     
-    return simTime*ms, clockStep*ms, SpikeGeneratorGroup(N, indices, times*ms, dt, sorted=True)
+    if dt is None:
+        dt = clockStep*ms
+    
+    return simTime, clockStep, SpikeGeneratorGroup(N, indices, times*ms, dt, sorted=True)
 
 
 
