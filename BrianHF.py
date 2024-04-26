@@ -100,7 +100,7 @@ def nudge_ts(ts, nudge=1e-6):
 # Convert the event camera data to spikes
 # XXX: Make it take the keys as arguments or even consider taking x, y, t, p as arguments
 # XXX: make sure the time units make sense. Right now it is arbitrarily in ms. I'm not even sure if it is in ms.
-def event_to_spike(eventStream, width, height, dt= None , val_indices=False, clear_dup=True):
+def event_to_spike(eventStream, width, height, dt= None , val_indices=False, clear_dup=True, scale: float = 1.0):
     """
     Converts an event to a spike based on the threshold.
 
@@ -149,20 +149,23 @@ def event_to_spike(eventStream, width, height, dt= None , val_indices=False, cle
         times, indices = clear_duplicates(times, indices)
     else:
         times, indices = sort_events(list(zip(times, indices)))
+        
+        
+    print("The selected scale is", scale)
     # Convert the time from seconds to milliseconds
-    times = np.array(times) * 1000
+    times = np.array(times) * 1000 * scale
 
     # Calculate the simulation time as the ceil of the last spike time
     maxTime = times[-1]
-    print(f'The maximum time stamp {maxTime}')
+    print(f'The maximum time stamp (scaled) {maxTime} ms.')
     simTime = np.ceil(times[-1])
-    print(f'The recommended simulation time is {simTime}')
+    print(f'The recommended simulation time (scaled) is {simTime} ms.')
     
     # Calculate the (defaultClock.dt) time step as the floor of the smallest time difference between events
     minTimeStep = min(abs(diff(list(set(times)))))
-    print(f'The minimum time step is {minTimeStep}')    
-    clockStep =  round(minTimeStep, decimal_index(minTimeStep))
-    print(f'The recommended clock time step is {clockStep}')
+    print(f'The minimum time step (scaled) is {minTimeStep} ms.')    
+    clockStep =  round(minTimeStep*10, decimal_index(minTimeStep))/10
+    print(f'The recommended clock time step (scaled) is {clockStep} ms.')
     
     if dt is None:
         dt = clockStep*ms
@@ -264,6 +267,27 @@ def visualise_spikes(spikeMonitorsList, figTitle='', figSize=(15, 3)):
         ylabel('Neuron index')
         title(figTitle)
 
+
+def visualise_spike_difference(spikeMon1, spikeMon2, figTitle='', figSize=(15, 3)):
+    """
+    Presents the raster plots of the spike times from the spike monitors
+
+    Args:
+        spikeMonitorsList (list): List of SpikeMonitor objects that record the neuron spikes.
+        figTitle (str, optional): Title for the plot. Defaults to an empty string.
+        figSize (tuple, optional): The size of the figure (width, height). Defaults to (15, 3).
+
+    Returns:
+        None
+    """
+    
+    
+    figure(figsize=figSize)
+    plot(spikeMon1.t/ms, spikeMon1.i, '.k')
+    plot(spikeMon2.t/ms, spikeMon2.i, '.r')
+    xlabel('Time (ms)')
+    ylabel('Neuron index')
+    title(figTitle
 # Function to visualize the time between spikes and how it varies through time for a set or a single neuron
 def visualise_interSpikeInterval(spikeMonitor, neuron_indices ,figSize=(10, 5)):
     """
