@@ -93,6 +93,7 @@ def clear_duplicates(times, indices):
         return sorted_times, sorted_indices
     else:
         print("No duplicate pairs found.")
+        print("Total number of pairs/spikes: ", len(pairs_set), " pairs.")
         sorted_times, sorted_indices = sort_events(pairs_set)
         return sorted_times, sorted_indices
 
@@ -103,7 +104,7 @@ def nudge_ts(ts, nudge=1e-6):
 # Convert the event camera data to spikes
 # XXX: Make it take the keys as arguments or even consider taking x, y, t, p as arguments
 # XXX: make sure the time units make sense. Right now it is arbitrarily in ms. I'm not even sure if it is in ms.
-def event_to_spike(eventStream, width, height, dt= None , val_indices=False, clear_dup=True, scale: float = 1.0):
+def event_to_spike(eventStream, width, height, dt= None , val_indices=False, clear_dup=True, timeScale: float = 1.0):
     """
     Converts an event to a spike based on the threshold.
 
@@ -151,12 +152,13 @@ def event_to_spike(eventStream, width, height, dt= None , val_indices=False, cle
     if clear_dup:
         times, indices = clear_duplicates(times, indices)
     else:
+        print("Skipping checking for duplicate pairs.")
         times, indices = sort_events(list(zip(times, indices)))
         
         
-    print("The selected scale is", scale)
+    print("The selected scale is", timeScale)
     # Convert the time from seconds to milliseconds
-    times = np.array(times) * 1000 * scale
+    times = np.array(times) * 1000 * timeScale
 
     # Calculate the simulation time as the ceil of the last spike time
     maxTime = times[-1]
@@ -374,6 +376,16 @@ def gen_InOut_framesVid(inSpikeMon, outSpikeMon, widthIn, heightIn, heightOut, w
         
     return inFramesList, outFramesList
 
+# Create a function to generate a frame for a given time step
+def generate_frame(num_neurons, t, spikeMon_dict, width, height):
+    # Create an array of length num_neurons to store the spikes
+    frameArray = np.zeros(num_neurons)
+    
+    # Set the elements corresponding to neurons that spiked at time t to 1
+    frameArray[spikeMon_dict[t]] = 1
+    
+    return frameArray.reshape(height, width)
+    
 # Generate image frames from a spike monitor (for GIFs)
 def generate_frames(spikeMon, width, height, num_neurons, samplePercentage=1.0):
     """
@@ -411,22 +423,16 @@ def generate_frames(spikeMon, width, height, num_neurons, samplePercentage=1.0):
     framesList = np.zeros((len(spikeTimes), width, height))
 
     # Convert spikeMon to a dictionary for faster lookups
+    #XXX: Evaluate if this is actually faster than using the spikeMon.i and spikeMon.t/ms
     spikeMon_dict = {t: spikeMon.i[spikeMon.t/ms == t] for t in spikeTimes}
 
-    # Create a function to generate a frame for a given time step
-    def generate_frame(t):
-        # Create an array of length num_neurons to store the spikes
-        frameArray = np.zeros(num_neurons)
-        
-        # Set the elements corresponding to neurons that spiked at time t to 1
-        frameArray[spikeMon_dict[t]] = 1
-        
-        return frameArray.reshape(width, height)
+    # Create the arguments list for the pool
+    argList = [(num_neurons, t, spikeMon_dict, width, height) for t in spikeTimes]
     
     # Create a pool of worker processes
     with Pool() as pool:
         # Use the pool to generate frames in parallel
-        framesList = np.array(pool.imap(generate_frame, spikeTimes, chunksize=1000))
+        framesList = pool.starmap(generate_frame, argList, chunksize=10)
         
     return framesList
     
@@ -461,7 +467,7 @@ def generate_binary_video(frames, output_path):
     out.release()
 
 # Generate a GIF from the frames
-def generate_gif(frames, output_path, simTime: float, replicateDuration = False):
+def generate_gif(frames, output_path, simTime: float, replicateDuration = False, duration=0.01):
     """
     Generate a GIF from a list of frames.
 
@@ -484,8 +490,6 @@ def generate_gif(frames, output_path, simTime: float, replicateDuration = False)
     
     if replicateDuration:
         duration = simTime/len(gif_frames)  # Duration of each frame in the GIF
-    else:
-        duration = 0.5
         
     # Save the frames as a GIF
     imageio.mimsave(output_path, gif_frames, duration=duration)
