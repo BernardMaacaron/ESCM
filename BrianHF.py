@@ -1,6 +1,9 @@
 from brian2 import *
 import cv2
 import sys
+import imageio
+from tqdm.notebook import tqdm as tqdm_notebook
+from tqdm import tqdm as tqdm_cli
 
 # NOTE: The following comments are longterm TODOs and are not urgent. They are just suggestions for future improvements.
 # TODO : Validate the documentation of the functions
@@ -267,7 +270,7 @@ def visualise_spikes(spikeMonitorsList, figTitle='', figSize=(15, 3)):
         ylabel('Neuron index')
         title(figTitle)
 
-
+# TODO: Implement the function
 def visualise_spike_difference(spikeMon1, spikeMon2, figTitle='', figSize=(15, 3)):
     """
     Presents the raster plots of the spike times from the spike monitors
@@ -280,14 +283,13 @@ def visualise_spike_difference(spikeMon1, spikeMon2, figTitle='', figSize=(15, 3
     Returns:
         None
     """
-    
-    
     figure(figsize=figSize)
     plot(spikeMon1.t/ms, spikeMon1.i, '.k')
     plot(spikeMon2.t/ms, spikeMon2.i, '.r')
     xlabel('Time (ms)')
     ylabel('Neuron index')
-    title(figTitle
+    title(figTitle)
+    
 # Function to visualize the time between spikes and how it varies through time for a set or a single neuron
 def visualise_interSpikeInterval(spikeMonitor, neuron_indices ,figSize=(10, 5)):
     """
@@ -325,18 +327,20 @@ List of functions to generate image frames from the spike monitors of the input 
     - generate_InOut_frames(inSpikeMon, outSpikeMon, heightIn, widthIn, heightOut, widthOut, num_neurons)
     - generate_binary_video(frames, output_path)
 '''
-# Generate image frames from the spike monitors of the input and output layers 
-def generate_InOut_frames(inSpikeMon, outSpikeMon, heightIn, widthIn, heightOut, widthOut, num_neurons):
+# Generate image frames from the spike monitors of the input and output layers (for videos)
+def gen_InOut_framesVid(inSpikeMon, outSpikeMon, widthIn, heightIn, heightOut, widthOut, num_neurons):
     """
-    Generate input and output frames based on spike monitor data.
+    Generate input and output frames based on spike monitor data Required function if you are attempting
+    to generate videos of same lengths as the spike times between input and output are not the same.
+    To generate frames for a GIF use generate_frames() function.
 
     Parameters:
     - inSpikeMon (SpikeMonitor): Spike monitor for input neurons.
     - outSpikeMon (SpikeMonitor): Spike monitor for output neurons.
-    - heightIn (int): Height of the input frame.
     - widthIn (int): Width of the input frame.
-    - heightOut (int): Height of the output frame.
+    - heightIn (int): Height of the input frame.
     - widthOut (int): Width of the output frame.
+    - heightOut (int): Height of the output frame.
     - num_neurons (int): Number of neurons.
 
     Returns:
@@ -365,14 +369,59 @@ def generate_InOut_frames(inSpikeMon, outSpikeMon, heightIn, widthIn, heightOut,
         inArray[inSpikeMon.i[inIndices]] = 1
         outArray[outSpikeMon.i[outIndices]] = 1
         
-        inFramesList.append(inArray.reshape(heightIn, widthIn))
-        outFramesList.append(outArray.reshape(heightOut, widthOut))
+        inFramesList.append(inArray.reshape(widthIn, heightIn))
+        outFramesList.append(outArray.reshape(widthOut, heightOut))
         
     return inFramesList, outFramesList
+
+# Generate image frames from a spike monitor (for GIFs)
+def generate_frames(spikeMon, width, height, num_neurons):
+    """
+    Generate frames based on spike monitor data.
+
+    Parameters:
+    - spikeMon (SpikeMonitor): The SpikeMonitor object that records the neuron spikes.
+    - width (int): The width of the frame.
+    - height (int): The height of the frame.
+    - num_neurons (int): The number of neurons.
+
+    Returns:
+    - framesList (list): List of frames.
+    """
+    
+    # Create a list to store the frames
+    framesList = []
+    
+    # Get the timestamps of the simulation
+    spikeTimes = np.unique(spikeMon.t/ms)
+    
+    # Create a frame for each time step
+    for t in tqdm(spikeTimes):
+        # Create an array of length num_neurons to store the spikes
+        frameArray = np.zeros(num_neurons)
         
+        # Get the indices of the neurons that spiked at time t
+        indices = np.where(spikeMon.t/ms == t)[0]
+        
+        # Set the corresponding elements to 1
+        frameArray[spikeMon.i[indices]] = 1
+        
+        framesList.append(frameArray.reshape(width, height))
+        
+    return framesList
+    
 # Generate a binary video from the frames (normally generated using generate_InOut_frames())
 def generate_binary_video(frames, output_path):
-    
+    """
+    Generate a binary video from a list of frames.
+
+    Args:
+        frames (list): A list of frames.
+        output_path (str): The path to save the generated video.
+
+    Returns:
+        None
+    """
     height, width = frames[0].shape
     # Create a VideoWriter object
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -391,7 +440,35 @@ def generate_binary_video(frames, output_path):
     # Release the VideoWriter object
     out.release()
 
+# Generate a GIF from the frames
+def generate_gif(frames, output_path, simTime: float, replicateDuration = False):
+    """
+    Generate a GIF from a list of frames.
 
+    Args:
+        frames (list): A list of frames.
+        output_path (str): The path to save the generated GIF.
+        duration (float, optional): The duration of each frame in the GIF. Defaults to 0.1.
+
+    Returns:
+        None
+    """
+    # Create a list to store the frames
+    gif_frames = []
+    
+    # Convert the frames to 8-bit binary images
+    for frame in frames:
+        # Convert the frame to 8-bit binary image
+        binary_frame = np.uint8(frame * 254)
+        gif_frames.append(binary_frame)
+    
+    if replicateDuration:
+        duration = simTime/len(gif_frames)  # Duration of each frame in the GIF
+    else:
+        duration = 0.5
+        
+    # Save the frames as a GIF
+    imageio.mimsave(output_path, gif_frames, duration=duration)
 
 
 
