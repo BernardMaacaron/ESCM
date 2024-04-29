@@ -2,8 +2,8 @@ from brian2 import *
 import cv2
 import sys
 import imageio
-from tqdm.notebook import tqdm as tqdm_notebook
-from tqdm import tqdm as tqdm_cli
+from tqdm.autonotebook import tqdm
+from multiprocessing import Pool
 
 # NOTE: The following comments are longterm TODOs and are not urgent. They are just suggestions for future improvements.
 # TODO : Validate the documentation of the functions
@@ -375,7 +375,7 @@ def gen_InOut_framesVid(inSpikeMon, outSpikeMon, widthIn, heightIn, heightOut, w
     return inFramesList, outFramesList
 
 # Generate image frames from a spike monitor (for GIFs)
-def generate_frames(spikeMon, width, height, num_neurons):
+def generate_frames(spikeMon, width, height, num_neurons, samplePercentage=1.0):
     """
     Generate frames based on spike monitor data.
 
@@ -384,29 +384,49 @@ def generate_frames(spikeMon, width, height, num_neurons):
     - width (int): The width of the frame.
     - height (int): The height of the frame.
     - num_neurons (int): The number of neurons.
+    - samplePercentage (float, optional): The percentage of spikes to sample (0.0 - 1.0). Default is 1.0.
 
     Returns:
     - framesList (list): List of frames.
+
+    This function takes a SpikeMonitor object, which records the spikes of neurons, and generates frames based on the spike data.
+    The frames are represented as NumPy arrays with dimensions (num_spikes, width, height).
+    The function samples a certain percentage of the spikes at regular intervals and creates frames based on the sampled spikes.
+    The frames are generated in parallel using a pool of worker processes.
+
+    Example usage:
+    spikeMon = SpikeMonitor(...)
+    frames = generate_frames(spikeMon, 32, 32, 1000, samplePercentage=0.5)
     """
-    
-    # Create a list to store the frames
-    framesList = []
     
     # Get the timestamps of the simulation
     spikeTimes = np.unique(spikeMon.t/ms)
     
-    # Create a frame for each time step
-    for t in tqdm(spikeTimes):
+    # Select a certain percentage of the spikes at regular intervals
+    num_spikes = len(spikeTimes)
+    interval = int(num_spikes / (num_spikes * samplePercentage))
+    spikeTimes = spikeTimes[::interval]
+    
+    # Preallocate framesList as a NumPy array
+    framesList = np.zeros((len(spikeTimes), width, height))
+
+    # Convert spikeMon to a dictionary for faster lookups
+    spikeMon_dict = {t: spikeMon.i[spikeMon.t/ms == t] for t in spikeTimes}
+
+    # Create a function to generate a frame for a given time step
+    def generate_frame(t):
         # Create an array of length num_neurons to store the spikes
         frameArray = np.zeros(num_neurons)
         
-        # Get the indices of the neurons that spiked at time t
-        indices = np.where(spikeMon.t/ms == t)[0]
+        # Set the elements corresponding to neurons that spiked at time t to 1
+        frameArray[spikeMon_dict[t]] = 1
         
-        # Set the corresponding elements to 1
-        frameArray[spikeMon.i[indices]] = 1
-        
-        framesList.append(frameArray.reshape(width, height))
+        return frameArray.reshape(width, height)
+    
+    # Create a pool of worker processes
+    with Pool() as pool:
+        # Use the pool to generate frames in parallel
+        framesList = np.array(pool.imap(generate_frame, spikeTimes, chunksize=1000))
         
     return framesList
     
