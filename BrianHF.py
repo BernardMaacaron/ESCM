@@ -104,7 +104,9 @@ def nudge_ts(ts, nudge=1e-6):
 # Convert the event camera data to spikes
 # XXX: Make it take the keys as arguments or even consider taking x, y, t, p as arguments
 # XXX: make sure the time units make sense. Right now it is arbitrarily in ms. I'm not even sure if it is in ms.
-def event_to_spike(eventStream, width, height, dt= None , val_indices=False, clear_dup=True, timeScale: float = 1.0):
+# XXX: Consider using dictionaries with dictionary comprehension for the eventStream data
+def event_to_spike(eventStream, width, height, dt= None , val_indices=False, clear_dup=True, timeScale: float = 1.0,
+                   samplePercentage=1.0):
     """
     Converts an event to a spike based on the threshold.
 
@@ -128,12 +130,18 @@ def event_to_spike(eventStream, width, height, dt= None , val_indices=False, cle
     
     N = height * width
     
+    # Select a certain percentage of the spikes at regular intervals
+    print("Selecting a percentage of the spikes at regular intervals... Percentage: ", samplePercentage*100, "%")
+    num_samples = np.count_nonzero(eventStream['pol'])
+    interval = int(num_samples / (num_samples * samplePercentage))
+    
+    
     # Retrieve the x, y, time, and polarity data from the event stream
     # NOTE: The time extracted from the event stream is in seconds (Read bimvee library documentation).
     #       It is converted into milliseconds post processing.
-    firing_x = eventStream['x'][eventStream['pol']]
-    firing_y = eventStream['y'][eventStream['pol']]
-    times = eventStream['ts'][eventStream['pol']]
+    firing_x = eventStream['x'][eventStream['pol']][::interval][0:1000]
+    firing_y = eventStream['y'][eventStream['pol']][::interval][0:1000]
+    times = eventStream['ts'][eventStream['pol']][::interval][0:1000]
         
     print(f'The maximum x index {np.max(firing_x)} while the width is {width}')
     print(f'The maximum y index {np.max(firing_y)} while the height is {height}')
