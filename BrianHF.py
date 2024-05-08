@@ -4,10 +4,17 @@ import sys
 import imageio
 from tqdm.autonotebook import tqdm
 from multiprocessing import Pool
+import os
+from multiprocessing import Pool
+from multiprocessing import Pool
 
 # NOTE: The following comments are longterm TODOs and are not urgent. They are just suggestions for future improvements.
 # TODO : Validate the documentation of the functions
 # TODO : Turn the conditionals into exceptions
+
+
+
+
 
 ''' - EVENT CAMERA HANDLING FUNCTIONS -
 List of functions to handle the event camera data and adapt it to the simulation requirements.
@@ -105,10 +112,10 @@ def nudge_ts(ts, nudge=1e-6):
 # XXX: Make it take the keys as arguments or even consider taking x, y, t, p as arguments
 # XXX: make sure the time units make sense. Right now it is arbitrarily in ms. I'm not even sure if it is in ms.
 # XXX: Consider using dictionaries with dictionary comprehension for the eventStream data
-def event_to_spike(eventStream, width, height, dt= None , val_indices=False, clear_dup=True, timeScale: float = 1.0,
-                   samplePercentage=1.0):
+def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear_dup=True, timeScale: float = 1.0,                   samplePercentage=1.0, polarity=False):
     """
-    Converts an event to a spike based on the threshold.
+    Converts an event to a spike based on the threshold. the event data is assumed to be in the form of a dictionary 
+    and the spike representation is generated as a SpikeGeneratorGroup object from Brian2.
 
     Parameters:
     - eventStream (dictionary): The event stream data. The keys are 'x', 'y', 'ts', and 'p'.
@@ -121,6 +128,9 @@ def event_to_spike(eventStream, width, height, dt= None , val_indices=False, cle
     - dt (float, optional): The time resolution of the spike generator. Defaults to None.
     - val_indices (bool, optional): Flag to validate indices. Defaults to False.
     - clear_dup (bool, optional): Flag to clear duplicate events. Defaults to True.
+    - timeScale (float, optional): The scaling factor for the time. Defaults to 1.0.
+    - samplePercentage (float, optional): The percentage of spikes to select at regular intervals. Defaults to 1.0.
+    - polarity (bool, optional): Flag to take polarity into consideration. Defaults to False.
 
     Returns:
     - simTime (float*ms): The recommended simulation time that spans all spike times.
@@ -128,20 +138,30 @@ def event_to_spike(eventStream, width, height, dt= None , val_indices=False, cle
     - spikeGen (SpikeGeneratorGroup): The SpikeGeneratorGroup object respective to the event stream.
     """
     
+    print("Extracting the event data...")
     N = height * width
+    
+    # Define the mask to extract the event data based on whether polarity is considered or not
+    if polarity:
+        mask = eventStream['pol']
+        print("Polarity was chosen to be considered. Note that for now this means only positive polarity events are extracted.")
+    else:
+        mask = np.ones(len(eventStream['pol']), dtype=bool)
+        print("Polarity was chosen to be ignored. All events are extracted.")
+    
     
     # Select a certain percentage of the spikes at regular intervals
     print("Selecting a percentage of the spikes at regular intervals... Percentage: ", samplePercentage*100, "%")
-    num_samples = np.count_nonzero(eventStream['pol'])
+    num_samples = np.count_nonzero(mask)
     interval = int(num_samples / (num_samples * samplePercentage))
     
     
     # Retrieve the x, y, time, and polarity data from the event stream
     # NOTE: The time extracted from the event stream is in seconds (Read bimvee library documentation).
     #       It is converted into milliseconds post processing.
-    firing_x = eventStream['x'][eventStream['pol']][::interval][0:1000]
-    firing_y = eventStream['y'][eventStream['pol']][::interval][0:1000]
-    times = eventStream['ts'][eventStream['pol']][::interval][0:1000]
+    firing_x = eventStream['x'][mask][::interval]
+    firing_y = eventStream['y'][mask][::interval]
+    times = eventStream['ts'][mask][::interval]
         
     print(f'The maximum x index {np.max(firing_x)} while the width is {width}')
     print(f'The maximum y index {np.max(firing_y)} while the height is {height}')
@@ -338,6 +358,7 @@ List of functions to generate image frames from the spike monitors of the input 
     - generate_binary_video(frames, output_path)
 '''
 # Generate image frames from the spike monitors of the input and output layers (for videos)
+# XXX: THIS NEEDS A COMPLETE REFACTORING. THE FUNCTION IS NOT EFFICIENT.
 def gen_InOut_framesVid(inSpikeMon, outSpikeMon, widthIn, heightIn, heightOut, widthOut, num_neurons):
     """
     Generate input and output frames based on spike monitor data Required function if you are attempting
@@ -375,9 +396,9 @@ def gen_InOut_framesVid(inSpikeMon, outSpikeMon, widthIn, heightIn, heightOut, w
         inIndices = np.where(inSpikeMon.t/ms == t)[0]
         outIndices = np.where(outSpikeMon.t/ms == t)[0]
         
-        # Set the corresponding elements to 1
-        inArray[inSpikeMon.i[inIndices]] = 1
-        outArray[outSpikeMon.i[outIndices]] = 1
+        # Set the corresponding elements to np.uint8(254)
+        inArray[inSpikeMon.i[inIndices]] = np.uint8(254)
+        outArray[outSpikeMon.i[outIndices]] = np.uint8(254)
         
         inFramesList.append(inArray.reshape(widthIn, heightIn))
         outFramesList.append(outArray.reshape(widthOut, heightOut))
@@ -385,16 +406,18 @@ def gen_InOut_framesVid(inSpikeMon, outSpikeMon, widthIn, heightIn, heightOut, w
     return inFramesList, outFramesList
 
 # Create a function to generate a frame for a given time step
-def generate_frame(num_neurons, t, spikeMon_dict, width, height):
+def spikes2frame(num_neurons, neuronIndexes, width, height):
     # Create an array of length num_neurons to store the spikes
     frameArray = np.zeros(num_neurons)
     
     # Set the elements corresponding to neurons that spiked at time t to 1
-    frameArray[spikeMon_dict[t]] = 1
+    frameArray[neuronIndexes] = 1
     
     return frameArray.reshape(height, width)
-    
+
 # Generate image frames from a spike monitor (for GIFs)
+# TODO XXX: Consider a different way to parallelize the process. The current method is not efficient. See NOTE.
+# NOTE: The current bottleneck is not the frame generation per se, but the creation of the arguments in argsList (neuron index, timestamps etc.)
 def generate_frames(spikeMon, width, height, num_neurons, samplePercentage=1.0):
     """
     Generate frames based on spike monitor data.
@@ -420,32 +443,74 @@ def generate_frames(spikeMon, width, height, num_neurons, samplePercentage=1.0):
     """
     
     # Get the timestamps of the simulation
-    spikeTimes = np.unique(spikeMon.t/ms)
+    spikeTimes, occurenceIndex = np.unique(spikeMon.t/ms, return_index=True)
+    occurenceIndex = np.append(occurenceIndex, len(spikeMon.t))
     
     # Select a certain percentage of the spikes at regular intervals
     num_spikes = len(spikeTimes)
     interval = int(num_spikes / (num_spikes * samplePercentage))
     spikeTimes = spikeTimes[::interval]
     
-    # Preallocate framesList as a NumPy array
-    framesList = np.zeros((len(spikeTimes), width, height))
-
-    # Convert spikeMon to a dictionary for faster lookups
-    #XXX: Evaluate if this is actually faster than using the spikeMon.i and spikeMon.t/ms
-    spikeMon_dict = {t: spikeMon.i[spikeMon.t/ms == t] for t in spikeTimes}
-
-    # Create the arguments list for the pool
-    argList = [(num_neurons, t, spikeMon_dict, width, height) for t in spikeTimes]
+    # # Preallocate framesList as a NumPy array
+    # framesList = np.zeros((len(spikeTimes), width, height))
     
-    # Create a pool of worker processes
-    with Pool() as pool:
+    # Create the arguments list for the pool
+    argList = [(num_neurons, spikeMon.i[occurenceIndex[i-1]: occurenceIndex[i]], width, height) for i in range(1, len(occurenceIndex))] 
+
+    # argList = [(num_neurons, t, spikeMon.i[occurenceIndex], width, height) for t in spikeTimes]
+    
+    num_proc = os.cpu_count()
+    print(f'Generating frames using {num_proc} pooled processes...')         
+    with Pool(processes=num_proc) as pool:
         # Use the pool to generate frames in parallel
-        framesList = pool.starmap(generate_frame, argList, chunksize=10)
+        framesList = pool.starmap(spikes2frame, argList, chunksize=int(len(argList)/num_proc))
         
     return framesList
+
+# Generate a GIF from the frames
+def generate_gif(frames, output_path, simTime: float, replicateDuration=False, duration=0.1):
+    """
+    Generate a GIF from a list of frames.
+
+    Args:
+        frames (list): A list of frames.
+        output_path (str): The path to save the generated GIF.
+        simTime (float): The total simulation time.
+        replicateDuration (bool, optional): Flag to indicate whether to replicate the duration of each frame in the GIF. 
+                                            If True, the duration of each frame will be adjusted based on the total simulation time. 
+                                            If False, the duration of each frame will be set to the default value. Defaults to False.
+        fps (int, optional): The frames per second for the generated GIF. Defaults to 10.
+
+    Returns:
+        None
+    """
+    # Create a list to store the frames
+    gif_frames = []
+    
+    # Convert the frames to 8-bit binary images
+    for frame in frames:
+        # Convert the frame to a binary image
+        binary_frame = np.uint8(frame * 254)
+        # Add the binary frame to the list
+        gif_frames.append(binary_frame)
+    
+    if replicateDuration:
+        duration = simTime / len(gif_frames)  # Duration of each frame in the GIF
+        
+    # Save the frames as a GIF
+    imageio.mimsave(output_path, gif_frames, duration=duration)
+
+# Generate a video frame from a frame representation of the spikes (for binary videos)
+def generate_videoFrame (frame, width, height):
+    # Convert the frame to 8-bit binary image
+    binary_frame = np.uint8(frame * 254)
+    # Reshape the frame to match the desired width and height
+    binary_frame = cv2.resize(binary_frame, (width+1, height+1), interpolation=cv2.INTER_CUBIC)
+    return binary_frame
     
 # Generate a binary video from the frames (normally generated using generate_InOut_frames())
-def generate_binary_video(frames, output_path):
+# XXX: Currently I suppose the videos generated will have different lengths. Evaluate if i need to compare the timestamps for input and output.
+def generate_video(frames, output_path, simTime: float):
     """
     Generate a binary video from a list of frames.
 
@@ -459,48 +524,23 @@ def generate_binary_video(frames, output_path):
     height, width = frames[0].shape
     # Create a VideoWriter object
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(output_path, fourcc, 1.0, (height+1, width+1), isColor=False)
+    out = cv2.VideoWriter(output_path, fourcc, frameSize=(width+1, height+1), isColor=False, fps=np.round(len(frames) / simTime))
 
-    # Write each frame to the video
-    for frame in frames:
-        # Convert the frame to 8-bit binary image
-        binary_frame = np.uint8(frame * 254)
-        # Reshape the frame to match the desired width and height
-        binary_frame = cv2.resize(binary_frame, (height+1, width+1), interpolation=cv2.INTER_CUBIC)
+    # Create a pool of worker processes
+    num_proc = os.cpu_count()
+    with Pool(processes=num_proc) as pool:
+        # Process each frame in parallel
+        processed_frames = pool.starmap(generate_videoFrame, [(frame, width, height) for frame in frames])
 
+    # Write each processed frame to the video
+    for binary_frame in processed_frames:
         # Write the frame to the video
         out.write(binary_frame)
 
     # Release the VideoWriter object
     out.release()
 
-# Generate a GIF from the frames
-def generate_gif(frames, output_path, simTime: float, replicateDuration = False, duration=0.01):
-    """
-    Generate a GIF from a list of frames.
 
-    Args:
-        frames (list): A list of frames.
-        output_path (str): The path to save the generated GIF.
-        duration (float, optional): The duration of each frame in the GIF. Defaults to 0.1.
-
-    Returns:
-        None
-    """
-    # Create a list to store the frames
-    gif_frames = []
-    
-    # Convert the frames to 8-bit binary images
-    for frame in frames:
-        # Convert the frame to 8-bit binary image
-        binary_frame = np.uint8(frame * 254)
-        gif_frames.append(binary_frame)
-    
-    if replicateDuration:
-        duration = simTime/len(gif_frames)  # Duration of each frame in the GIF
-        
-    # Save the frames as a GIF
-    imageio.mimsave(output_path, gif_frames, duration=duration)
 
 
 
@@ -520,6 +560,24 @@ def decimal_index(num):
         return 0
     return int(np.abs(np.floor(np.log10(np.abs(num)))))
 
+def pathGenerator(stemName='UndefinedStem', params: dict={}):
+    """
+    Generates a path based on the stem name and parameters.
+
+    Args:
+        stemName (str): The stem name for the path.
+        params (dict): A dictionary of parameters.
+
+    Returns:
+        str: The generated path.
+    """
+    
+    # Build a path based on the stem name and the dictionary of parameters
+    path = stemName + '_'
+    for key, value in params.items():
+        path += f'{key}={value}_'
+    return path
+    
 class ProgressBar(object):
     def __init__(self, toolbar_width=40):
         self.toolbar_width = toolbar_width
