@@ -1,4 +1,16 @@
-EQ_LIF = '''
+EQ_LIF_N = '''
+dv/dt = -(v - I/gL) / tau                                                        : volt (unless refractory)
+X                                                                                : 1 
+Y                                                                                : 1
+
+I = Ia + Ig                                                              : volt/second # total input current - GABA, Inhibitory and AMPA, Excitatory
+dIg/dt = (-Ig)/taugd                                                             : volt/second
+dIa/dt = (-Ia)/tauad                                                             : volt/second
+'''
+
+#############################
+
+Bi_EQ_LIF = '''
 dv/dt = -(v - I/gL) / tau                                                        : volt (unless refractory)
 X                                                                                : 1 
 Y                                                                                : 1
@@ -12,6 +24,8 @@ I_AMPA = K_AMPA * Ia                                                            
 dIa/dt = (-Ia+Ia1)/tauad                                                         : volt/second
 dIa1/dt = -Ia1/tauar                                                             : volt/second
 '''
+
+############################
 
 GEN_EQ_LIF = '''
 dv/dt = (v0 - v - I/gL) / tau                                                    : volt (unless refractory)

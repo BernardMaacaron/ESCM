@@ -8,6 +8,10 @@
 #       format_name: light
 #       format_version: '1.5'
 #       jupytext_version: 1.16.2
+#   kernelspec:
+#     display_name: IIT
+#     language: python
+#     name: python3
 # ---
 
 # +
@@ -54,14 +58,14 @@ eventStream.popitem()
 tau = 10
 vt = 15
 vr = 0
-v0 = 20
+v0 = 0 # Currently unused
 gL = 1
-K_GABA = 1
-K_AMPA = 10
+K_GABA = 1 # Currently unused
+K_AMPA = 10 # Currently unused
 taugd = 5
-tauad = 2
+tauad = 2  # Currently unused
 taugr = 0.25
-tauar = 0.5
+tauar = 0.5  # Currently unused
 w_N = 80
 w_G = 30
 w_A = 50
@@ -72,7 +76,7 @@ defaultclock.dt = 1*us
 # HACK XXX: The input is now not in real time, must be fixed eventually to process real time event data
 # IMPORTANT NOTE: Output is float, so we need to convert to Quantities (i.e give them units)
 simTime, clockStep, inputSpikesGen = BrianHF.event_to_spike(eventStream, grid_width, grid_height, timeScale = 1.0, samplePercentage=1.0)
-defaultclock.dt = clockStep*ms
+# defaultclock.dt = clockStep*ms
 print("Input event stream successfully converted to spike trains\n")
 # -
 
@@ -92,9 +96,9 @@ gL = gL/ms    # Leak Conductance - Not necessarily used
     Neighborhood Size (num_Neighbors) - Affects the number of neighbors a central neuron based on the L1 Distance
     Neighboring Neurons --> (abs(X_pre - X_post) <= num_Neighbors  and abs(Y_pre - Y_post) <= num_Neighbors)
 '''
-num_Neighbors = 2
+num_Neighbors = 2    # Number of neighbors
 
-Eqs_Neurons = NeuronEquations.EQ_LIF    # Neuron Equations
+Eqs_Neurons = NeuronEquations.EQ_LIF_N    # Neuron Equations
 
 # Synapse Parameters
 K_GABA = K_GABA
@@ -103,6 +107,7 @@ taugd = taugd * ms
 tauad = tauad * ms
 taugr = taugr * ms
 tauar = tauar * ms
+
 
 # Generate the dictionary of parameters for the network
 networkParams = {'N_N': N_Neurons, 'k': num_Neighbors, 'tau': tau, 'vt': vt, 'vr': vr, 'v0': v0, 'gL': gL,
@@ -113,7 +118,7 @@ networkParams = {'N_N': N_Neurons, 'k': num_Neighbors, 'tau': tau, 'vt': vt, 'vr
 
 # +
 # TODO XXX: The events are running on the clockStep, I should at least fix them to use the (event_driven) setting in Brian2
-neuronsGrid = NeuronGroup(N_Neurons, Eqs_Neurons, threshold='v>vt', reset='v = vr', refractory=1 * ms, method='euler')
+neuronsGrid = NeuronGroup(N_Neurons, Eqs_Neurons, threshold='v>vt', reset='v = vr')
 
 # FIXME: Verify the grid coordinates and assign the X and Y values to the neurons accordingly
 # Generate x and y values for each neuron
@@ -125,9 +130,9 @@ neuronsGrid.Y = y_values
 
 # #### _4. Create the synapses_
 
-Syn_Input_Neurons = Synapses(inputSpikesGen, neuronsGrid, 'w : volt/second', on_pre='Ia1 += w')
-Syn_Neurons_GABA = Synapses(neuronsGrid, neuronsGrid, 'w : volt/second', on_pre='Ig1 -= w')
-Syn_Neurons_AMPA = Synapses(neuronsGrid, neuronsGrid, 'w : volt/second', on_pre='Ia1 += w')
+Syn_Input_Neurons = Synapses(inputSpikesGen, neuronsGrid, 'w : volt/second', on_pre='Ia += w') # NOTE: Use Ia1 or Ia depending on the neuron equation used
+Syn_Neurons_GABA = Synapses(neuronsGrid, neuronsGrid, 'w : volt/second', on_pre='Ig -= w') # NOTE: Use Ia1 or Ia depending on the neuron equation used
+Syn_Neurons_AMPA = Synapses(neuronsGrid, neuronsGrid, 'w : volt/second', on_pre='Ia += w') # NOTE: Use Ia1 or Ia depending on the neuron equation used
 
 # #### _5. Connect the synapses_
 
@@ -172,33 +177,53 @@ print("Simulation complete\n")
 # +
 print("Generating Visualizable Outputs:")
 resultPath = 'SimulationResults'
-inputStr = BrianHF.pathGenerator('netIn', networkParams)
-outputStr = BrianHF.pathGenerator('netOut', networkParams)
+inputStr = BrianHF.filePathGenerator('tempnetIn', networkParams)
+outputStr = BrianHF.filePathGenerator('tempnetOut', networkParams)
+
+# Create the folder if it doesn't exist
+if not os.path.exists(resultPath):
+    os.makedirs(resultPath)
+
+# Create the subfolders if they don't exist
+subfolders = ['numpyFrames', 'gifs', 'videos']
+for subfolder in subfolders:
+    subfolderPath = os.path.join(resultPath, subfolder)
+    if not os.path.exists(subfolderPath):
+        os.makedirs(subfolderPath)
+# -
+
+BrianHF.visualise_connectivity(Syn_Input_Neurons)
+BrianHF.visualise_spikes([SpikeMon_Input, SpikeMon_Neurons])
+BrianHF.visualise_spike_difference(SpikeMon_Input, SpikeMon_Neurons)
+
+# +
 
 # Generate the frames for input and output
 print("Generating Frames for Input...", end=' ')
 inputFrames = BrianHF.generate_frames(SpikeMon_Input, grid_width, grid_height, num_neurons=N_Neurons)
-print("Generating Complete.")
+print("Generation Complete.")
 print("Generating Frames for Output...", end=' ')
 outputFrames = BrianHF.generate_frames(SpikeMon_Neurons, grid_width, grid_height, num_neurons=N_Neurons)
-print("Generating Complete.")
-
+print("Generation Complete.")
 # Save the frames
 np.save(os.path.join(resultPath, 'numpyFrames', inputStr+'.npy'), inputFrames)
 np.save(os.path.join(resultPath, 'numpyFrames', outputStr+'.npy'), outputFrames)
-# -
 
 # Generate the GIFs from the frames
-print("Generating Input GIF")
-BrianHF.generate_gif(inputFrames, os.path.join(resultPath, 'gifs', inputStr+'.gif'), simTime, replicateDuration=False, duration=1e-8)
-print("Generating Output GIF")
-BrianHF.generate_gif(outputFrames, os.path.join(resultPath, 'gifs', outputStr+'.gif'), simTime, replicateDuration=False ,duration=1e-8)
+print("Generating Input GIF", end=' ')
+BrianHF.generate_gif(inputFrames, os.path.join(resultPath, 'gifs', inputStr+'.gif'), simTime, replicateDuration=True, duration=1e-8)
+print("Generation Complete.")
+print("Generating Output GIF", end=' ')
+BrianHF.generate_gif(outputFrames, os.path.join(resultPath, 'gifs', outputStr+'.gif'), simTime, replicateDuration=True ,duration=1e-8)
+print("Generation Complete.")
 
 # Generate the Videos from the frames
-print("Generating Input Video")
+print("Generating Input Video", end=' ')
 BrianHF.generate_video(outputFrames, os.path.join(resultPath, 'videos', inputStr+'.mp4'), simTime)
-print("Generating Output Video")
+print("Generation Complete.")
+print("Generating Output Video", end=' ')
 BrianHF.generate_video(outputFrames, os.path.join(resultPath, 'videos', outputStr+'.mp4'), simTime)
+print("Generation Complete.")
 
 # +
 # store('SimOut', 'SimulationOutput')   # Store the state of the simulation after running
@@ -215,30 +240,4 @@ BrianHF.generate_video(outputFrames, os.path.join(resultPath, 'videos', outputSt
 # BrianHF.visualise_interSpikeInterval(SpikeMon_Neurons, [5])
 # BrianHF.visualise_neurons_states(StateMon_Neurons, [4, 5], 'all')    
 #
-# %%
-# '''
-# BUG: For some reason, generating a network object and running it causes an error:
-#      "RuntimeError: spikegeneratorgroup has already been simulated, cannot add it
-#       to the network. If you were trying to remove and add an object to temporarily stop it from being run, set its active flag to False instead."
-#
-# HACK: This is a hack to avoid the weird error that happens when using a network object
-#       and not the magic version of the run function 'run()
-# '''
-# if False:
-#     try:
-#         net = Network(collect())
-#         net.store('PreSim', 'PreSimulationState')
-#         net.run(simTime*ms, report=BrianHF.ProgressBar(), report_period=1*second, profile=True)
-#         net.store('SimOut', 'SimulationOutput')
-#         profiling_summary(net.profiling_info)
-#     except RuntimeError as e:
-#         print(f"HACK: I have no idea why this error happens. Might be a bug in\
-#             the library.\n{e}")
-#         
-#         store('PreSim', 'PreSimulationState')
-#         run(simTime*ms, report=BrianHF.ProgressBar(), report_period=1*second, profile=True)
-#         store('SimOut', 'SimulationOutput')
-#         profiling_summary(profiling_info)
-#
-#
-# """
+

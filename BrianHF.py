@@ -1,19 +1,27 @@
-from brian2 import *
-import cv2
-import sys
-import imageio
-from tqdm.autonotebook import tqdm
 from multiprocessing import Pool
 import os
-from multiprocessing import Pool
-from multiprocessing import Pool
+import sys
+
+import cv2
+import imageio
+from brian2 import *
+from tqdm.autonotebook import tqdm
+
+# # Figures mpl style
+# axes.linewidth : 1
+# xtick.labelsize : 8
+# ytick.labelsize : 8
+# axes.labelsize : 8
+# lines.linewidth : 1
+# lines.markersize : 2
+# legend.frameon : False
+# legend.fontsize : 8
+# axes.prop_cycle : cycler(color=['e41a1c', '377eb8', '4daf4a', '984ea3', 'ff7f00', 'ffff33'])
+
 
 # NOTE: The following comments are longterm TODOs and are not urgent. They are just suggestions for future improvements.
 # TODO : Validate the documentation of the functions
 # TODO : Turn the conditionals into exceptions
-
-
-
 
 
 ''' - EVENT CAMERA HANDLING FUNCTIONS -
@@ -111,8 +119,7 @@ def nudge_ts(ts, nudge=1e-6):
 # Convert the event camera data to spikes
 # XXX: Make it take the keys as arguments or even consider taking x, y, t, p as arguments
 # XXX: make sure the time units make sense. Right now it is arbitrarily in ms. I'm not even sure if it is in ms.
-# XXX: Consider using dictionaries with dictionary comprehension for the eventStream data
-def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear_dup=True, timeScale: float = 1.0,                   samplePercentage=1.0, polarity=False):
+def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear_dup=True, timeScale: float = 1.0, samplePercentage=1.0, polarity=False):
     """
     Converts an event to a spike based on the threshold. the event data is assumed to be in the form of a dictionary 
     and the spike representation is generated as a SpikeGeneratorGroup object from Brian2.
@@ -137,9 +144,8 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
     - clockStep (float*ms): The recommended clock time step based on the minimum time difference between events.
     - spikeGen (SpikeGeneratorGroup): The SpikeGeneratorGroup object respective to the event stream.
     """
-    
     print("Extracting the event data...")
-    N = height * width
+    num_neurons = height * width
     
     # Define the mask to extract the event data based on whether polarity is considered or not
     if polarity:
@@ -149,19 +155,17 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
         mask = np.ones(len(eventStream['pol']), dtype=bool)
         print("Polarity was chosen to be ignored. All events are extracted.")
     
-    
     # Select a certain percentage of the spikes at regular intervals
     print("Selecting a percentage of the spikes at regular intervals... Percentage: ", samplePercentage*100, "%")
     num_samples = np.count_nonzero(mask)
     interval = int(num_samples / (num_samples * samplePercentage))
     
-    
     # Retrieve the x, y, time, and polarity data from the event stream
     # NOTE: The time extracted from the event stream is in seconds (Read bimvee library documentation).
     #       It is converted into milliseconds post processing.
-    firing_x = eventStream['x'][mask][::interval]
-    firing_y = eventStream['y'][mask][::interval]
-    times = eventStream['ts'][mask][::interval]
+    firing_x = eventStream['x'][mask][::interval][:10]
+    firing_y = eventStream['y'][mask][::interval][:10]
+    times = eventStream['ts'][mask][::interval][:10]
         
     print(f'The maximum x index {np.max(firing_x)} while the width is {width}')
     print(f'The maximum y index {np.max(firing_y)} while the height is {height}')
@@ -183,7 +187,6 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
         print("Skipping checking for duplicate pairs.")
         times, indices = sort_events(list(zip(times, indices)))
         
-        
     print("The selected scale is", timeScale)
     # Convert the time from seconds to milliseconds
     times = np.array(times) * 1000 * timeScale
@@ -203,7 +206,8 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
     if dt is None:
         dt = clockStep*ms
     
-    return simTime, clockStep, SpikeGeneratorGroup(N, indices, times*ms, dt, sorted=True)
+    
+    return simTime, clockStep, SpikeGeneratorGroup(num_neurons, indices, times*ms, dt, sorted=True)
 
 
 
@@ -299,6 +303,7 @@ def visualise_spikes(spikeMonitorsList, figTitle='', figSize=(15, 3)):
         xlabel('Time (ms)')
         ylabel('Neuron index')
         title(figTitle)
+    show()
 
 # TODO: Implement the function
 def visualise_spike_difference(spikeMon1, spikeMon2, figTitle='', figSize=(15, 3)):
@@ -319,6 +324,7 @@ def visualise_spike_difference(spikeMon1, spikeMon2, figTitle='', figSize=(15, 3
     xlabel('Time (ms)')
     ylabel('Neuron index')
     title(figTitle)
+    show()
     
 # Function to visualize the time between spikes and how it varies through time for a set or a single neuron
 def visualise_interSpikeInterval(spikeMonitor, neuron_indices ,figSize=(10, 5)):
@@ -407,6 +413,19 @@ def gen_InOut_framesVid(inSpikeMon, outSpikeMon, widthIn, heightIn, heightOut, w
 
 # Create a function to generate a frame for a given time step
 def spikes2frame(num_neurons, neuronIndexes, width, height):
+    """
+    Convert spike information to a frame array.
+
+    Args:
+        num_neurons (int): The total number of neurons.
+        neuronIndexes (array-like): The indexes of the neurons that spiked at time t.
+        width (int): The width of the frame array.
+        height (int): The height of the frame array.
+
+    Returns:
+        numpy.ndarray: The frame array with spike information.
+
+    """
     # Create an array of length num_neurons to store the spikes
     frameArray = np.zeros(num_neurons)
     
@@ -451,20 +470,20 @@ def generate_frames(spikeMon, width, height, num_neurons, samplePercentage=1.0):
     interval = int(num_spikes / (num_spikes * samplePercentage))
     spikeTimes = spikeTimes[::interval]
     
-    # # Preallocate framesList as a NumPy array
-    # framesList = np.zeros((len(spikeTimes), width, height))
-    
     # Create the arguments list for the pool
     argList = [(num_neurons, spikeMon.i[occurenceIndex[i-1]: occurenceIndex[i]], width, height) for i in range(1, len(occurenceIndex))] 
 
     # argList = [(num_neurons, t, spikeMon.i[occurenceIndex], width, height) for t in spikeTimes]
     
     num_proc = os.cpu_count()
-    print(f'Generating frames using {num_proc} pooled processes...')         
+    # print(f'Generating frames using {num_proc} pooled processes...')         
     with Pool(processes=num_proc) as pool:
         # Use the pool to generate frames in parallel
         framesList = pool.starmap(spikes2frame, argList, chunksize=int(len(argList)/num_proc))
         
+    return framesList
+
+
     return framesList
 
 # Generate a GIF from the frames
@@ -560,7 +579,7 @@ def decimal_index(num):
         return 0
     return int(np.abs(np.floor(np.log10(np.abs(num)))))
 
-def pathGenerator(stemName='UndefinedStem', params: dict={}):
+def filePathGenerator(stemName='UndefinedStem', params: dict={}):
     """
     Generates a path based on the stem name and parameters.
 
@@ -571,7 +590,6 @@ def pathGenerator(stemName='UndefinedStem', params: dict={}):
     Returns:
         str: The generated path.
     """
-    
     # Build a path based on the stem name and the dictionary of parameters
     path = stemName + '_'
     for key, value in params.items():
@@ -597,3 +615,7 @@ class ProgressBar(object):
                 self.ticks = ticks_needed
         if complete == 1.0:
             sys.stdout.write("\n")
+        sys.stdout.write(f"Elapsed (real-time): {elapsed} s. - Completed: {complete*100:.2f}%\n")
+        sys.stdout.write(f"Biological: Start: {start} - Duration: {duration}\n")
+        sys.stdout.flush()
+
