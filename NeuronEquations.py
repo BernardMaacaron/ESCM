@@ -3,7 +3,7 @@ dv/dt = -(v - I/gL) / tau                                                       
 X                                                                                : 1 
 Y                                                                                : 1
 
-I = Ia + Ig                                                              : volt/second # total input current - GABA, Inhibitory and AMPA, Excitatory
+I = Ia + Ig                                                                      : volt/second # total input current - GABA, Inhibitory and AMPA, Excitatory
 dIg/dt = (-Ig)/taugd                                                             : volt/second
 dIa/dt = (-Ia)/tauad                                                             : volt/second
 '''

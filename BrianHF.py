@@ -163,9 +163,9 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
     # Retrieve the x, y, time, and polarity data from the event stream
     # NOTE: The time extracted from the event stream is in seconds (Read bimvee library documentation).
     #       It is converted into milliseconds post processing.
-    firing_x = eventStream['x'][mask][::interval][:10]
-    firing_y = eventStream['y'][mask][::interval][:10]
-    times = eventStream['ts'][mask][::interval][:10]
+    firing_x = eventStream['x'][mask][::interval]
+    firing_y = eventStream['y'][mask][::interval]
+    times = eventStream['ts'][mask][::interval]
         
     print(f'The maximum x index {np.max(firing_x)} while the width is {width}')
     print(f'The maximum y index {np.max(firing_y)} while the height is {height}')
@@ -611,11 +611,15 @@ class ProgressBar(object):
             ticks_needed = int(round(complete * self.toolbar_width))
             if self.ticks < ticks_needed:
                 sys.stdout.write("-" * (ticks_needed-self.ticks))
+                # sys.stdout.flush()
+                
+                sys.stdout.write(f"Elapsed (real-time): {elapsed} s. - Completed: {complete*100:.2f}%\n")
+                sys.stdout.write(f"Biological: Start: {start} - Duration: {duration}\n")
                 sys.stdout.flush()
+                
                 self.ticks = ticks_needed
+
         if complete == 1.0:
             sys.stdout.write("\n")
-        sys.stdout.write(f"Elapsed (real-time): {elapsed} s. - Completed: {complete*100:.2f}%\n")
-        sys.stdout.write(f"Biological: Start: {start} - Duration: {duration}\n")
-        sys.stdout.flush()
+
 

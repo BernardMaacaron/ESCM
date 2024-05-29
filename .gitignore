@@ -1,3 +1,15 @@
 __pycache__/BrianHF.cpython-310.pyc
 __pycache__/EvCamDatabase.cpython-310.pyc
 __pycache__/NeuronEquations.cpython-310.pyc
+SimulationResults/gifs/netIn_N_N=89960_k=2_tau=10. ms_vt=15. mV_vr=0. V_v0=20. mV_gL=ms^-1_K_GABA=1_K_AMPA=10_taugd=5. ms_tauad=2. ms_taugr=250. us_tauar=0.5 ms_w_N=80_w_G=30_w_A=50_.gif
+SimulationResults/gifs/netOut_N_N=89960_k=2_tau=10. ms_vt=15. mV_vr=0. V_v0=20. mV_gL=ms^-1_K_GABA=1_K_AMPA=10_taugd=5. ms_tauad=2. ms_taugr=250. us_tauar=0.5 ms_w_N=80_w_G=30_w_A=50_.gif
+SimulationResults/numpyFrames/netIn_N_N=89960_k=2_tau=10. ms_vt=15. mV_vr=0. V_v0=20. mV_gL=ms^-1_K_GABA=1_K_AMPA=10_taugd=5. ms_tauad=2. ms_taugr=250. us_tauar=0.5 ms_w_N=80_w_G=30_w_A=50_.npy
+SimulationResults/numpyFrames/netOut_N_N=89960_k=2_tau=10. ms_vt=15. mV_vr=0. V_v0=20. mV_gL=ms^-1_K_GABA=1_K_AMPA=10_taugd=5. ms_tauad=2. ms_taugr=250. us_tauar=0.5 ms_w_N=80_w_G=30_w_A=50_.npy
+SimulationResults/videos/netIn_N_N=89960_k=2_tau=10. ms_vt=15. mV_vr=0. V_v0=20. mV_gL=ms^-1_K_GABA=1_K_AMPA=10_taugd=5. ms_tauad=2. ms_taugr=250. us_tauar=0.5 ms_w_N=80_w_G=30_w_A=50_.mp4
+SimulationResults/videos/netOut_N_N=89960_k=2_tau=10. ms_vt=15. mV_vr=0. V_v0=20. mV_gL=ms^-1_K_GABA=1_K_AMPA=10_taugd=5. ms_tauad=2. ms_taugr=250. us_tauar=0.5 ms_w_N=80_w_G=30_w_A=50_.mp4
+SimulationResults/gifs/tempnetIn_N_N=89960_k=2_tau=10. ms_vt=1. mV_vr=0. V_v0=0. V_gL=ms^-1_K_GABA=0_K_AMPA=0_taugd=1. ms_tauad=4. ms_taugr=250. us_tauar=0.5 ms_w_N=100_w_G=2_w_A=0_.gif
+SimulationResults/gifs/tempnetOut_N_N=89960_k=2_tau=10. ms_vt=1. mV_vr=0. V_v0=0. V_gL=ms^-1_K_GABA=0_K_AMPA=0_taugd=1. ms_tauad=4. ms_taugr=250. us_tauar=0.5 ms_w_N=100_w_G=2_w_A=0_.gif
+SimulationResults/numpyFrames/tempnetIn_N_N=89960_k=2_tau=10. ms_vt=1. mV_vr=0. V_v0=0. V_gL=ms^-1_K_GABA=0_K_AMPA=0_taugd=1. ms_tauad=4. ms_taugr=250. us_tauar=0.5 ms_w_N=100_w_G=2_w_A=0_.npy
+SimulationResults/numpyFrames/tempnetOut_N_N=89960_k=2_tau=10. ms_vt=1. mV_vr=0. V_v0=0. V_gL=ms^-1_K_GABA=0_K_AMPA=0_taugd=1. ms_tauad=4. ms_taugr=250. us_tauar=0.5 ms_w_N=100_w_G=2_w_A=0_.npy
+SimulationResults/videos/tempnetIn_N_N=89960_k=2_tau=10. ms_vt=1. mV_vr=0. V_v0=0. V_gL=ms^-1_K_GABA=0_K_AMPA=0_taugd=1. ms_tauad=4. ms_taugr=250. us_tauar=0.5 ms_w_N=100_w_G=2_w_A=0_.mp4
+SimulationResults/videos/tempnetOut_N_N=89960_k=2_tau=10. ms_vt=1. mV_vr=0. V_v0=0. V_gL=ms^-1_K_GABA=0_K_AMPA=0_taugd=1. ms_tauad=4. ms_taugr=250. us_tauar=0.5 ms_w_N=100_w_G=2_w_A=0_.mp4

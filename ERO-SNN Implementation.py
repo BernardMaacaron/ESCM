@@ -56,19 +56,19 @@ eventStream.popitem()
 
 # +
 tau = 10
-vt = 15
+vt = 1
 vr = 0
 v0 = 0 # Currently unused
 gL = 1
-K_GABA = 1 # Currently unused
-K_AMPA = 10 # Currently unused
-taugd = 5
-tauad = 2  # Currently unused
-taugr = 0.25
+K_GABA = 0 # Currently unused
+K_AMPA = 0 # Currently unused
+taugd = 1
+tauad = 4  
+taugr = 0.25 # Currently unused
 tauar = 0.5  # Currently unused
-w_N = 80
-w_G = 30
-w_A = 50
+w_N = 100
+w_G = 2
+w_A = 0 # Currently unused
 
 
 
@@ -76,7 +76,7 @@ defaultclock.dt = 1*us
 # HACK XXX: The input is now not in real time, must be fixed eventually to process real time event data
 # IMPORTANT NOTE: Output is float, so we need to convert to Quantities (i.e give them units)
 simTime, clockStep, inputSpikesGen = BrianHF.event_to_spike(eventStream, grid_width, grid_height, timeScale = 1.0, samplePercentage=1.0)
-# defaultclock.dt = clockStep*ms
+defaultclock.dt = clockStep*ms
 print("Input event stream successfully converted to spike trains\n")
 # -
 
@@ -118,7 +118,7 @@ networkParams = {'N_N': N_Neurons, 'k': num_Neighbors, 'tau': tau, 'vt': vt, 'vr
 
 # +
 # TODO XXX: The events are running on the clockStep, I should at least fix them to use the (event_driven) setting in Brian2
-neuronsGrid = NeuronGroup(N_Neurons, Eqs_Neurons, threshold='v>vt', reset='v = vr')
+neuronsGrid = NeuronGroup(N_Neurons, Eqs_Neurons, threshold='v>vt', reset='v = vr', method='euler', refractory=5*ms)
 
 # FIXME: Verify the grid coordinates and assign the X and Y values to the neurons accordingly
 # Generate x and y values for each neuron
@@ -132,7 +132,7 @@ neuronsGrid.Y = y_values
 
 Syn_Input_Neurons = Synapses(inputSpikesGen, neuronsGrid, 'w : volt/second', on_pre='Ia += w') # NOTE: Use Ia1 or Ia depending on the neuron equation used
 Syn_Neurons_GABA = Synapses(neuronsGrid, neuronsGrid, 'w : volt/second', on_pre='Ig -= w') # NOTE: Use Ia1 or Ia depending on the neuron equation used
-Syn_Neurons_AMPA = Synapses(neuronsGrid, neuronsGrid, 'w : volt/second', on_pre='Ia += w') # NOTE: Use Ia1 or Ia depending on the neuron equation used
+Syn_Neurons_AMPA = Synapses(neuronsGrid, neuronsGrid, 'w : volt/second', on_pre='Ia = Ia') # NOTE: Use Ia1 or Ia depending on the neuron equation used
 
 # #### _5. Connect the synapses_
 
@@ -192,9 +192,9 @@ for subfolder in subfolders:
         os.makedirs(subfolderPath)
 # -
 
-BrianHF.visualise_connectivity(Syn_Input_Neurons)
-BrianHF.visualise_spikes([SpikeMon_Input, SpikeMon_Neurons])
-BrianHF.visualise_spike_difference(SpikeMon_Input, SpikeMon_Neurons)
+# BrianHF.visualise_connectivity(Syn_Input_Neurons)
+# BrianHF.visualise_spikes([SpikeMon_Input, SpikeMon_Neurons])
+# BrianHF.visualise_spike_difference(SpikeMon_Input, SpikeMon_Neurons)
 
 # +
 
