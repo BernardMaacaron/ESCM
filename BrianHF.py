@@ -255,7 +255,7 @@ def visualise_connectivity(SynapsesGroup, figSize=(10, 4)):
     ylabel('Target neuron index')
 
 # Visualize the chosen states of a list of neurons
-def visualise_neurons_states(stateMonitor, neuron_indices, states ,figSize=(10, 4)):
+def visualise_neurons_states(stateMonitor, neuron_indices, states ,figSize=(10, 4), overlap=False):
     """
     Visualizes the states of neurons over time.
 
@@ -274,14 +274,46 @@ def visualise_neurons_states(stateMonitor, neuron_indices, states ,figSize=(10, 
     num_columns = 2
     num_rows = int(np.ceil(len(statesList)/num_columns))
 
-    for neuron_index in neuron_indices:
+    if overlap:
         figure(figsize=figSize)
+    for neuron_index in neuron_indices:
+        if not overlap:
+            figure(figsize=figSize)
         for index, state in enumerate(statesList):
             subplot(num_rows, num_columns, index+1)
             plot(stateMonitor.t/ms, getattr(stateMonitor, state)[neuron_index])
             xlabel('Time (ms)')
             ylabel(state)           
             suptitle(f'Neuron {neuron_index} - Variable States')
+
+    show()
+
+# Visualize the chosen states of a list of neurons
+def visualise_states(stateMonitor, neuron_indices, states ,figSize=(10, 4), overlap=False):
+    """
+    Visualizes the states of neurons over time. Similar to visualise_neurons_states but plots all states per neuron on the same
+    figure and one neuron per figure.
+
+    Args:
+        stateMonitor (StateMonitor): The StateMonitor object that records the neuron states.
+        neuron_indices (list): A list of neuron indices to visualize.
+        states (str): The states to visualize. If 'all', all recorded states will be visualized.
+        figSize (tuple, optional): The size of the figure (width, height). Defaults to (10, 4).
+
+    Returns:
+        None
+    """
+    if states == 'all':
+        statesList = stateMonitor.record_variables
+
+    for neuron_index in neuron_indices:
+        figure(figsize=figSize)
+        for index, state in enumerate(statesList):
+            plot(stateMonitor.t/ms, getattr(stateMonitor, state)[neuron_index])
+            xlabel('Time (ms)')
+            ylabel(state)           
+            suptitle(f'Neuron {neuron_index} - Variable States')
+            legend(statesList)
     show()
 
 # Visualize the spikes of of the input and output layers
