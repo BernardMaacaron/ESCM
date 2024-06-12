@@ -119,6 +119,7 @@ def nudge_ts(ts, nudge=1e-6):
 # Convert the event camera data to spikes
 # XXX: Make it take the keys as arguments or even consider taking x, y, t, p as arguments
 # XXX: make sure the time units make sense. Right now it is arbitrarily in ms. I'm not even sure if it is in ms.
+# XXX: Refactor to make dt flag dependent on whether the user wants to use the default clock time step or not.
 def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear_dup=True, timeScale: float = 1.0, samplePercentage=1.0, polarity=False):
     """
     Converts an event to a spike based on the threshold. the event data is assumed to be in the form of a dictionary 
@@ -235,7 +236,7 @@ def visualise_connectivity(SynapsesGroup, figSize=(10, 4)):
     Returns:
     None
     """
-
+    
     Ns = len(SynapsesGroup.source)
     Nt = len(SynapsesGroup.target)
     figure(figsize = figSize)
@@ -247,12 +248,13 @@ def visualise_connectivity(SynapsesGroup, figSize=(10, 4)):
     ylabel('Neuron index')
     xlim(-0.1, 1.1)
     ylim(-1, max(Ns, Nt))
-    subplot(122)
+    figure(figsize = figSize)
     plot(SynapsesGroup.i, SynapsesGroup.j, 'ok')
     xlim(-1, Ns)
     ylim(-1, Nt)
     xlabel('Source neuron index')
     ylabel('Target neuron index')
+    show()
 
 # Visualize the chosen states of a list of neurons
 def visualise_neurons_states(stateMonitor, neuron_indices, states ,figSize=(10, 4), overlap=False):
