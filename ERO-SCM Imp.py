@@ -21,6 +21,7 @@ from brian2 import *
 import NeuronEquations
 import BrianHF
 import numpy as np
+import pickle
 
 from bimvee.importAe import importAe
 from EvCamDatabase import DAVIS_346B
@@ -42,30 +43,31 @@ except:
     eventStream = events[0]['data']['right']['dvs']
 eventStream.popitem()
 
-# ### Steps for the setting up the network:
+# ## Steps for the setting up the network:
 # 1. Generate the input spikes
-# 2. Set the parameters for the network (neurons and synapses)
-# 3. Create the neuron group(s)
-# 4. Create the synapses
-# 5. Connect the synapses
-# 6. Define the weights of the synapses
-# 7. Set up monitors according to need
-# 8. Run the simulation
-# 9. (Optional) Visualize the results
+# 2. Set the parameters for the Simulation and Network (Neurons, Synapses, etc.)
+# 3. Prepare the directory structure for saving the results
+# 4. Create the neuron group(s)
+# 5. Create the synapses
+# 6. Connect the synapses
+# 7. Define the weights of the synapses
+# 8. Set up monitors according to need
+# 9. Run the simulation
+# 10. (Optional) Visualize the results
 #
-# #### _1. Generate the input spikes from the event stream_
-# ###### _Brian Simulation Scope_
-#
+
+# ### 1. Generate the input spikes from the event stream
+# ###### Brian Simulation Scope
 
 # +
 # HACK XXX: The input is now not in real time, must be fixed eventually to process real time event data
 # IMPORTANT NOTE: Output is float, so we need to convert to Quantities (i.e give them units)
 
-
 # Simulation Parameters
 defaultclock.dt = 0.05*ms
 SaveNumpyFrames = False
 GenerateGIFs = False
+GenerateVideos = True
 
 
 simTime, clockStep, inputSpikesGen = BrianHF.event_to_spike(eventStream, grid_width, grid_height, dt = defaultclock.dt, timeScale = 1.0, samplePercentage=1.0)
@@ -73,8 +75,8 @@ simTime, clockStep, inputSpikesGen = BrianHF.event_to_spike(eventStream, grid_wi
 print("Input event stream successfully converted to spike trains\n")
 # -
 
-# #### _2. Set the parameters for the network (neurons and synapses)_
-# Parameter values can be tuned per namespace(this is done for clarity purposes).
+# ### 2. Set the parameters for the Simulation and Network (Neurons, Synapses, etc.)
+# Parameter values can be tuned per namespace (this is done for clarity purposes).
 
 # +
 # NOTE: The values are unitless for now, time constants are in ms simply to be able to tune to the simulation clock
@@ -107,7 +109,26 @@ Wk = Syn_Params['Wk']
 networkParams = {**Neuron_Params, **Syn_Params, 'Sim_Clock': defaultclock.dt}
 # -
 
-# #### _3. Create the neuron group(s)_
+# ### 3. Prepare the directory structure for saving the results
+
+# +
+resultPath = 'SimulationResults'
+inputStr = BrianHF.filePathGenerator('SCM_IF_IN', networkParams)
+outputStr = BrianHF.filePathGenerator('SCM_IF_OUT', networkParams)
+
+# Create the folder if it doesn't exist
+if not os.path.exists(resultPath):
+    os.makedirs(resultPath)
+
+# Create the subfolders if they don't exist
+subfolders = ['spikeFrames', 'numpyFrames', 'gifs', 'videos']
+for subfolder in subfolders:
+    subfolderPath = os.path.join(resultPath, subfolder)
+    if not os.path.exists(subfolderPath):
+        os.makedirs(subfolderPath)
+# -
+
+# ### 4. Create the neuron group(s)
 
 print('Creating Neuron Groups...')
 
@@ -139,7 +160,7 @@ neuronsGrid.Y = y_values
 
 print('Neuron Groups created successfully\n')
 
-# #### _4. Create the synapses_
+# #### 5. Create the synapses
 
 print('Creating Synapse Connections...')
 
@@ -159,97 +180,166 @@ Syn_Neurons_Neurons = Synapses(neuronsGrid, neuronsGrid,
                                namespace=Syn_Params)
 # -
 
-# #### _5. Connect the synapses_
+# ### 6. Connect the synapses
 
 # Connect the first synapses from input to G_neurons on a 1 to 1 basis
 Syn_Input_Neurons.connect(j='i') 
 Syn_Input_Neurons.beta = beta
 
-# Connect the inhibitory group of synapses from a neuron to its neighbors. Reminder: No need for autapses as we are using _pre
-Syn_Neurons_Neurons.connect(condition='i != j and abs(X_pre - X_post) <= Num_Neighbours and abs(Y_pre - Y_post) <= Num_Neighbours')
+# +
+''' NOTE: The following code implements the connections for the Neurons to Neurons synapses
+which as mentioned before implicitly includes the autapses.
+The code below is a faster implementation of:
+    Syn_Neurons_Neurons.connect(condition='i != j and abs(X_pre - X_post) <= Num_Neighbours and abs(Y_pre - Y_post) <= Num_Neighbours')
+'''
+
+indexes_i, indexes_j = BrianHF.calculate_ChebyshevNeighbours(neuronsGrid, Num_Neighbours)
+Syn_Neurons_Neurons.connect(i=indexes_i, j=indexes_j)
 Syn_Neurons_Neurons.Wi = Wi
 Syn_Neurons_Neurons.Wk = Wk
+# -
 
 print('Synapse Connections created successfully\n')
 
-# #### _6. Set up monitors_
+# ### 7. Set up monitors
 
+# +
 SpikeMon_Input = SpikeMonitor(inputSpikesGen)    # Monitor the spikes from the input
-SpikeMon_Neurons = SpikeMonitor(neuronsGrid)    # Monitor the spikes from the neuron grid
+
+# IMPORTANT NOTE: The SpikeMonitor for the active neurons is moved to the simulation block to avoid memory issues.
+# The data is now broken down into smaller chunks and saved to disk
+
 # StateMon_Neurons = StateMonitor(neuronsGrid, variables=True, record=True)    # Monitor the state variables - True for all variables. NOTE: WARNING!! Excessive memory usage
+# -
 
-# ### 7. Run the simulation_
+# ### 8. Run the simulation
 
-print(f"Running the simulation for {simTime} ms")
-if 'ipykernel' in sys.modules:
-    # Running in a Jupyter notebook
-    print("Running in a Jupyter notebook")
-    run(simTime*ms, profile=True)
-    # profiling_summary(net)
-else:
-    # Not running in a Jupyter notebook
-    print("Not running in a Jupyter notebook")
-    run(simTime*ms, report=BrianHF.ProgressBar(), report_period=1*second, profile=True)
-    # print(profiling_summary(net))
+# +
+N = 100  # Number of runs
+run_time = simTime / N  # Duration of each run
+
+spikeTimeStamps = []
+spikeIndices = []
+
+print("Starting simulation - Total time: ", simTime*ms)
+for i in range(N):
+    print(f"Running simulation chunk {i+1}/{N} for {run_time} ms")
+    SpikeMon_Neurons = SpikeMonitor(neuronsGrid)    # Monitor the spikes from the neuron grid
+    
+    if 'ipykernel' in sys.modules:
+        # Running in a Jupyter notebook
+        print("Running in a Jupyter notebook")
+        run(run_time*ms, profile=True)
+        # profiling_summary(net)
+    else:
+        # Not running in a Jupyter notebook
+        print("Not running in a Jupyter notebook")
+        run(run_time*ms, report=BrianHF.ProgressBar(), report_period=1*second, profile=True)
+        # print(profiling_summary(net))
+        
+    # Get states and dump
+    data_times = SpikeMon_Neurons.t
+    data_neurons = SpikeMon_Neurons.i
+    
+    spikeTimeStamps.append(data_times)
+    spikeIndices.append(data_neurons)
+    
+    del SpikeMon_Neurons
+    
+data = {'spikeTimeStamps': spikeTimeStamps, 'spikeIndices': spikeIndices}
+filename = os.path.join(resultPath, 'spikeFrames', outputStr+'.data')
+with open(filename, 'w') as f:
+    pickle.dump(data, f)
+del data
+
 print("Simulation complete\n")
+
+# -
 
 # #### _9. (Optional) Visualize the results_
 
-# +
 print("Generating Visualizable Outputs:")
-resultPath = 'SimulationResults'
-inputStr = BrianHF.filePathGenerator('tempnetIn', networkParams)
-outputStr = BrianHF.filePathGenerator('tempnetOut', networkParams)
-
-# Create the folder if it doesn't exist
-if not os.path.exists(resultPath):
-    os.makedirs(resultPath)
-
-# Create the subfolders if they don't exist
-subfolders = ['numpyFrames', 'gifs', 'videos']
-for subfolder in subfolders:
-    subfolderPath = os.path.join(resultPath, subfolder)
-    if not os.path.exists(subfolderPath):
-        os.makedirs(subfolderPath)
-# -
-
 # BrianHF.visualise_connectivity(Syn_Input_Neurons)
-BrianHF.visualise_spikes([SpikeMon_Input, SpikeMon_Neurons])
+# BrianHF.visualise_spikes([SpikeMon_Input, SpikeMon_Neurons])
 # BrianHF.visualise_spike_difference(SpikeMon_Input, SpikeMon_Neurons)
 
+
 # +
-# Generate the frames for input and output
+# Generate the frames for input
 print("Generating Frames for Input...", end=' ')
-inputFrames = BrianHF.generate_frames(SpikeMon_Input, grid_width, grid_height, num_neurons=N_Neurons)
-print("Generation Complete.")
-print("Generating Frames for Output...", end=' ')
-outputFrames = BrianHF.generate_frames(SpikeMon_Neurons, grid_width, grid_height, num_neurons=N_Neurons)
-print("Generation Complete.")
+inputFrames = BrianHF.generate_frames(spikeTimeStamps, spikeIndices, grid_width, grid_height, num_neurons=N_Neurons)
+print("Input Frames Generation Complete.")
 
+# Save the frames
 if SaveNumpyFrames:
-    # Save the frames
-    for name, frames in [(inputStr, inputFrames), (outputStr, outputFrames)]:
-        filename = os.path.join(resultPath, 'numpyFrames', name+'.npy')
-        if os.path.exists(filename):
-            filename = os.path.join(resultPath, 'numpyFrames', f"{name}_{int(time.time())}.npy")
-        np.save(filename, frames)
+    print("Saving Input Frames as Numpy Arrays...")
+    filename = os.path.join(resultPath, 'numpyFrames', inputStr+'.npy')
+    if os.path.exists(filename):
+        filename = os.path.join(resultPath, 'numpyFrames', f"{inputStr}_{int(time.time())}.npy")
+    np.save(filename, inputFrames)
+print("Input Numpy Array Saving Complete.")
 
+
+# Generate the GIFs from the frames
 if GenerateGIFs:
-    # Generate the GIFs from the frames
-    for name, frames in [(inputStr, inputFrames), (outputStr, outputFrames)]:
-        filename = os.path.join(resultPath, 'gifs', name+'.gif')
-        if os.path.exists(filename):
-            filename = os.path.join(resultPath, 'gifs', f"{name}_{int(time.time())}.gif")
-        BrianHF.generate_gif(frames, filename, simTime, replicateDuration=True, duration=1e-8)
+    print("Generating Input GIFs...")
+    filename = os.path.join(resultPath, 'gifs', inputStr+'.gif')
+    if os.path.exists(filename):
+        filename = os.path.join(resultPath, 'gifs', f"{inputStr}_{int(time.time())}.gif")
+    BrianHF.generate_gif(inputFrames, filename, simTime, replicateDuration=True, duration=1e-8)
+print("Input GIF Generation Complete.")
+
 
 # Generate the Videos from the frames
-for name, frames in [(inputStr, inputFrames), (outputStr, outputFrames)]:
-    filename = os.path.join(resultPath, 'videos', name+'.mp4')
+if GenerateVideos:
+    print("Generating Videos...")
+    filename = os.path.join(resultPath, 'videos', inputStr+'.mp4')
     if os.path.exists(filename):
-        filename = os.path.join(resultPath, 'videos', f"{name}_{int(time.time())}.mp4")
-    BrianHF.generate_video(frames, filename, simTime/1000)
+        filename = os.path.join(resultPath, 'videos', f"{inputStr}_{int(time.time())}.mp4")
+    BrianHF.generate_video(inputFrames, filename, simTime/1000)
+    print("Video Generation Complete.")
+
+del inputFrames
 
 # +
+print("Generating Frames for Output...", end=' ')
+outputFrames = BrianHF.generate_frames(spikeTimeStamps, spikeIndices, grid_width, grid_height, num_neurons=N_Neurons)
+print("Output Frames Generation Complete.")
+
+# Save the frames
+if SaveNumpyFrames:
+    print("Saving Input Frames as Numpy Arrays...")
+    filename = os.path.join(resultPath, 'numpyFrames', outputStr+'.npy')
+    if os.path.exists(filename):
+        filename = os.path.join(resultPath, 'numpyFrames', f"{outputStr}_{int(time.time())}.npy")
+    np.save(filename, outputFrames)
+print("Input Numpy Array Saving Complete.")
+
+
+# Generate the GIFs from the frames
+if GenerateGIFs:
+    print("Generating Input GIFs...")
+    filename = os.path.join(resultPath, 'gifs', outputStr+'.gif')
+    if os.path.exists(filename):
+        filename = os.path.join(resultPath, 'gifs', f"{outputStr}_{int(time.time())}.gif")
+    BrianHF.generate_gif(outputFrames, filename, simTime, replicateDuration=True, duration=1e-8)
+print("Input GIF Generation Complete.")
+
+
+# Generate the Videos from the frames
+if GenerateVideos:
+    print("Generating Videos...")
+    filename = os.path.join(resultPath, 'videos', outputStr+'.mp4')
+    if os.path.exists(filename):
+        filename = os.path.join(resultPath, 'videos', f"{outputStr}_{int(time.time())}.mp4")
+    BrianHF.generate_video(outputFrames, filename, simTime/1000)
+    print("Video Generation Complete.")
+
+del outputFrames
+
+# -
+
+'''
 # Generate the frames for input and output
 print("Generating Frames for Input...", end=' ')
 inputFrames = BrianHF.generate_frames(SpikeMon_Input, grid_width, grid_height, num_neurons=N_Neurons)
@@ -280,20 +370,7 @@ print("Generation Complete.")
 print("Generating Output Video", end=' ')
 BrianHF.generate_video(outputFrames, os.path.join(resultPath, 'videos', outputStr+'.mp4'), simTime/1000)
 print("Generation Complete.")
+'''
 
 # +
 # store('SimOut', 'SimulationOutput')   # Store the state of the simulation after running
-# -
-
-# """
-# I SHOULD REMOVE THIS
-# %%
-# VISUALISATION
-# BrianHF.visualise_spikes([SpikeMon_Input], figSize=(12,3), figTitle='Input Spikes')
-# BrianHF.visualise_spikes([SpikeMon_Neurons], figSize=(12,3), figTitle='Output Spikes')
-#
-# Ploting the interspike interval
-# BrianHF.visualise_interSpikeInterval(SpikeMon_Neurons, [5])
-# BrianHF.visualise_neurons_states(StateMon_Neurons, [4, 5], 'all')    
-#
-
