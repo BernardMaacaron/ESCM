@@ -647,9 +647,10 @@ class ProgressBar(object):
                 sys.stdout.write("-" * (ticks_needed-self.ticks))
                 sys.stdout.flush()
                 
-                hours = int(elapsed // 3600)
-                minutes = int((elapsed % 3600) // 60)
-                seconds = int(elapsed % 60)
+                elapsed_ = elapsed/second
+                hours = int(elapsed_ // 3600)
+                minutes = int((elapsed_ % 3600 // 60))
+                seconds = int(elapsed_ % 60)
                 sys.stdout.write(f"Elapsed (real-time): {hours:02d}:{minutes:02d}:{seconds:02d} - Completed: {complete*100:.2f}%\n")
                 # sys.stdout.write(f"Biological: Start: {start} - Duration: {duration}\n")
                 sys.stdout.flush()
