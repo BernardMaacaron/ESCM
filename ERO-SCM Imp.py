@@ -69,6 +69,9 @@ SaveNumpyFrames = False
 GenerateGIFs = False
 GenerateVideos = True
 
+GenerateInputVisuals = False
+GenerateOutputVisuals = True
+
 
 simTime, clockStep, inputSpikesGen = BrianHF.event_to_spike(eventStream, grid_width, grid_height, dt = defaultclock.dt, timeScale = 1.0, samplePercentage=1.0)
 # defaultclock.dt = clockStep*ms
@@ -215,9 +218,10 @@ SpikeMon_Input = SpikeMonitor(inputSpikesGen)    # Monitor the spikes from the i
 # ### 8. Run the simulation
 
 # +
-N = 100  # Number of runs
-run_time = simTime / N  # Duration of each run
+BrianLogger.log_level_error()    # Only log errors to avoid excessive output
 
+N = 10  # Number of runs
+run_time = simTime / N  # Duration of each run
 spikeTimeStamps = []
 spikeIndices = []
 
@@ -236,21 +240,17 @@ for i in range(N):
         print("Not running in a Jupyter notebook")
         run(run_time*ms, report=BrianHF.ProgressBar(), report_period=1*second, profile=True)
         # print(profiling_summary(net))
-        
-    # Get states and dump
-    data_times = SpikeMon_Neurons.t
-    data_neurons = SpikeMon_Neurons.i
     
-    spikeTimeStamps.append(data_times)
-    spikeIndices.append(data_neurons)
+    spikeTimeStamps.append(SpikeMon_Neurons.t)
+    spikeIndices.append(SpikeMon_Neurons.i)
     
     del SpikeMon_Neurons
     
-data = {'spikeTimeStamps': spikeTimeStamps, 'spikeIndices': spikeIndices}
-filename = os.path.join(resultPath, 'spikeFrames', outputStr+'.data')
-with open(filename, 'w') as f:
-    pickle.dump(data, f)
-del data
+# data = {'spikeTimeStamps': spikeTimeStamps, 'spikeIndices': spikeIndices}
+# filename = os.path.join(resultPath, 'spikeFrames', outputStr+'.data')
+# with open(filename, 'w') as f:
+#     pickle.dump(data, f)
+# del data
 
 print("Simulation complete\n")
 
@@ -264,80 +264,81 @@ print("Generating Visualizable Outputs:")
 # BrianHF.visualise_spike_difference(SpikeMon_Input, SpikeMon_Neurons)
 
 
-# +
 # Generate the frames for input
-print("Generating Frames for Input...", end=' ')
-inputFrames = BrianHF.generate_frames(spikeTimeStamps, spikeIndices, grid_width, grid_height, num_neurons=N_Neurons)
-print("Input Frames Generation Complete.")
+if GenerateInputVisuals:
+    print("Generating Frames for Input...", end=' ')
+    inputFrames = BrianHF.generate_frames(SpikeMon_Input.t, SpikeMon_Input.i, grid_width, grid_height, num_neurons=N_Neurons)
+    print("Input Frames Generation Complete.")
 
-# Save the frames
-if SaveNumpyFrames:
-    print("Saving Input Frames as Numpy Arrays...")
-    filename = os.path.join(resultPath, 'numpyFrames', inputStr+'.npy')
-    if os.path.exists(filename):
-        filename = os.path.join(resultPath, 'numpyFrames', f"{inputStr}_{int(time.time())}.npy")
-    np.save(filename, inputFrames)
-print("Input Numpy Array Saving Complete.")
-
-
-# Generate the GIFs from the frames
-if GenerateGIFs:
-    print("Generating Input GIFs...")
-    filename = os.path.join(resultPath, 'gifs', inputStr+'.gif')
-    if os.path.exists(filename):
-        filename = os.path.join(resultPath, 'gifs', f"{inputStr}_{int(time.time())}.gif")
-    BrianHF.generate_gif(inputFrames, filename, simTime, replicateDuration=True, duration=1e-8)
-print("Input GIF Generation Complete.")
+    # Save the frames
+    if SaveNumpyFrames:
+        print("Saving Input Frames as Numpy Arrays...")
+        filename = os.path.join(resultPath, 'numpyFrames', inputStr+'.npy')
+        if os.path.exists(filename):
+            filename = os.path.join(resultPath, 'numpyFrames', f"{inputStr}_{int(time.time())}.npy")
+        np.save(filename, inputFrames)
+    print("Input Numpy Array Saving Complete.")
 
 
-# Generate the Videos from the frames
-if GenerateVideos:
-    print("Generating Videos...")
-    filename = os.path.join(resultPath, 'videos', inputStr+'.mp4')
-    if os.path.exists(filename):
-        filename = os.path.join(resultPath, 'videos', f"{inputStr}_{int(time.time())}.mp4")
-    BrianHF.generate_video(inputFrames, filename, simTime/1000)
-    print("Video Generation Complete.")
-
-del inputFrames
-
-# +
-print("Generating Frames for Output...", end=' ')
-outputFrames = BrianHF.generate_frames(spikeTimeStamps, spikeIndices, grid_width, grid_height, num_neurons=N_Neurons)
-print("Output Frames Generation Complete.")
-
-# Save the frames
-if SaveNumpyFrames:
-    print("Saving Input Frames as Numpy Arrays...")
-    filename = os.path.join(resultPath, 'numpyFrames', outputStr+'.npy')
-    if os.path.exists(filename):
-        filename = os.path.join(resultPath, 'numpyFrames', f"{outputStr}_{int(time.time())}.npy")
-    np.save(filename, outputFrames)
-print("Input Numpy Array Saving Complete.")
+    # Generate the GIFs from the frames
+    if GenerateGIFs:
+        print("Generating Input GIFs...")
+        filename = os.path.join(resultPath, 'gifs', inputStr+'.gif')
+        if os.path.exists(filename):
+            filename = os.path.join(resultPath, 'gifs', f"{inputStr}_{int(time.time())}.gif")
+        BrianHF.generate_gif(inputFrames, filename, simTime, replicateDuration=True, duration=1e-8)
+    print("Input GIF Generation Complete.")
 
 
-# Generate the GIFs from the frames
-if GenerateGIFs:
-    print("Generating Input GIFs...")
-    filename = os.path.join(resultPath, 'gifs', outputStr+'.gif')
-    if os.path.exists(filename):
-        filename = os.path.join(resultPath, 'gifs', f"{outputStr}_{int(time.time())}.gif")
-    BrianHF.generate_gif(outputFrames, filename, simTime, replicateDuration=True, duration=1e-8)
-print("Input GIF Generation Complete.")
+    # Generate the Videos from the frames
+    if GenerateVideos:
+        print("Generating Videos...")
+        filename = os.path.join(resultPath, 'videos', inputStr+'.mp4')
+        if os.path.exists(filename):
+            filename = os.path.join(resultPath, 'videos', f"{inputStr}_{int(time.time())}.mp4")
+        BrianHF.generate_video(inputFrames, filename, simTime/1000)
+        print("Video Generation Complete.")
+
+    del inputFrames
+del SpikeMon_Input
+
+if GenerateOutputVisuals:
+    print("Generating Frames for Output...", end=' ')
+    outputFrames = BrianHF.generate_frames(spikeTimeStamps, spikeIndices, grid_width, grid_height, num_neurons=N_Neurons)
+    print("Output Frames Generation Complete.")
+
+    # Save the frames
+    if SaveNumpyFrames:
+        print("Saving Input Frames as Numpy Arrays...")
+        filename = os.path.join(resultPath, 'numpyFrames', outputStr+'.npy')
+        if os.path.exists(filename):
+            filename = os.path.join(resultPath, 'numpyFrames', f"{outputStr}_{int(time.time())}.npy")
+        np.save(filename, outputFrames)
+    print("Input Numpy Array Saving Complete.")
 
 
-# Generate the Videos from the frames
-if GenerateVideos:
-    print("Generating Videos...")
-    filename = os.path.join(resultPath, 'videos', outputStr+'.mp4')
-    if os.path.exists(filename):
-        filename = os.path.join(resultPath, 'videos', f"{outputStr}_{int(time.time())}.mp4")
-    BrianHF.generate_video(outputFrames, filename, simTime/1000)
-    print("Video Generation Complete.")
+    # Generate the GIFs from the frames
+    if GenerateGIFs:
+        print("Generating Input GIFs...")
+        filename = os.path.join(resultPath, 'gifs', outputStr+'.gif')
+        if os.path.exists(filename):
+            filename = os.path.join(resultPath, 'gifs', f"{outputStr}_{int(time.time())}.gif")
+        BrianHF.generate_gif(outputFrames, filename, simTime, replicateDuration=True, duration=1e-8)
+    print("Input GIF Generation Complete.")
 
-del outputFrames
 
-# -
+    # Generate the Videos from the frames
+    if GenerateVideos:
+        print("Generating Videos...")
+        filename = os.path.join(resultPath, 'videos', outputStr+'.mp4')
+        if os.path.exists(filename):
+            filename = os.path.join(resultPath, 'videos', f"{outputStr}_{int(time.time())}.mp4")
+        BrianHF.generate_video(outputFrames, filename, simTime/1000)
+        print("Video Generation Complete.")
+
+    del outputFrames
+del spikeTimeStamps, spikeIndices
+
 
 '''
 # Generate the frames for input and output
