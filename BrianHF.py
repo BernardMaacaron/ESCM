@@ -4,8 +4,8 @@ import sys
 
 import cv2
 import imageio
+from bimvee import exportIitYarp
 from brian2 import *
-from tqdm.autonotebook import tqdm
 
 # # Figures mpl style
 # axes.linewidth : 1
@@ -207,8 +207,9 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
     if dt is None:
         dt = clockStep*ms
     
-    
     return simTime, clockStep, SpikeGeneratorGroup(num_neurons, indices, times*ms, dt, sorted=True)
+
+
 
 
 ''' - SYNAPTIC CONNECTIVITY FUNCTIONS -'''
@@ -251,6 +252,7 @@ def calculate_ChebyshevNeighbours(neuronsGrid, Num_Neighbours, chunk_size=1000):
     indexes_i, indexes_j = zip(*pairs)
     
     return indexes_i, indexes_j
+
 
 
 
@@ -298,7 +300,7 @@ def visualise_connectivity(SynapsesGroup, figSize=(10, 4)):
     show()
 
 # Visualize the chosen states of a list of neurons
-def visualise_neurons_states(stateMonitor, neuron_indices, states ,figSize=(10, 4), overlap=False):
+def visualise_neurons_states(stateMonitor, neuron_indices, statesList ,figSize=(10, 4), overlap=False, vt = None):
     """
     Visualizes the states of neurons over time.
 
@@ -311,7 +313,7 @@ def visualise_neurons_states(stateMonitor, neuron_indices, states ,figSize=(10, 
     Returns:
         None
     """
-    if states == 'all':
+    if statesList == 'all':
         statesList = stateMonitor.record_variables
         
     num_columns = 2
@@ -325,6 +327,8 @@ def visualise_neurons_states(stateMonitor, neuron_indices, states ,figSize=(10, 
         for index, state in enumerate(statesList):
             subplot(num_rows, num_columns, index+1)
             plot(stateMonitor.t/ms, getattr(stateMonitor, state)[neuron_index])
+            if state == 'v' and vt is not None:
+                axhline(y=vt, linestyle='--', color='r')
             xlabel('Time (ms)')
             ylabel(state)           
             suptitle(f'Neuron {neuron_index} - Variable States')
@@ -332,7 +336,7 @@ def visualise_neurons_states(stateMonitor, neuron_indices, states ,figSize=(10, 
     show()
 
 # Visualize the chosen states of a list of neurons
-def visualise_states(stateMonitor, neuron_indices, states ,figSize=(10, 4), overlap=False):
+def visualise_states(stateMonitor, neuron_indices, statesList ,figSize=(10, 4), overlap=False, vt = None):
     """
     Visualizes the states of neurons over time. Similar to visualise_neurons_states but plots all states per neuron on the same
     figure and one neuron per figure.
@@ -346,12 +350,15 @@ def visualise_states(stateMonitor, neuron_indices, states ,figSize=(10, 4), over
     Returns:
         None
     """
-    if states == 'all':
+    if statesList == 'all':
         statesList = stateMonitor.record_variables
 
     for neuron_index in neuron_indices:
         figure(figsize=figSize)
         for index, state in enumerate(statesList):
+            if state == 'v' and vt is not None:
+                axhline(y=vt, linestyle='--', color='r')
+                
             plot(stateMonitor.t/ms, getattr(stateMonitor, state)[neuron_index])
             xlabel('Time (ms)')
             ylabel(state)           
@@ -537,7 +544,7 @@ def generate_frames(spikeMon_time, spikeMon_index, width, height, num_neurons, s
     """
     
     # Get the timestamps of the simulation
-    spikeTimes, occurenceIndex = np.unique(spikeMon_time/ms, return_index=True)
+    spikeTimes, occurenceIndex = np.unique(spikeMon_time, return_index=True)
     occurenceIndex = np.append(occurenceIndex, len(spikeMon_time))
     
     # Select a certain percentage of the spikes at regular intervals
@@ -550,11 +557,10 @@ def generate_frames(spikeMon_time, spikeMon_index, width, height, num_neurons, s
 
     # argList = [(num_neurons, t, spikeMon.i[occurenceIndex], width, height) for t in spikeTimes]
     
-    num_proc = os.cpu_count()
     # print(f'Generating frames using {num_proc} pooled processes...')         
-    with Pool(processes=num_proc) as pool:
+    with Pool() as pool:
         # Use the pool to generate frames in parallel
-        framesList = pool.starmap(spikes2frame, argList, chunksize=int(len(argList)/num_proc))
+        framesList = pool.starmap(spikes2frame, argList)
         
     return framesList
 
@@ -634,6 +640,13 @@ def generate_video(frames, output_path, simTime: float):
     # Release the VideoWriter object
     out.release()
 
+def generate_YarpDvs(spikeMon_time, spikeMon_index, NeuronGroup, path):
+    x_list = NeuronGroup.X[spikeMon_index]
+    y_list = NeuronGroup.Y[spikeMon_index]
+    data = {'ts': spikeMon_time, 'x': x_list, 'y': y_list, 'pol': ones(len(spikeMon_time), dtype=int)}
+    with open(path, 'wb') as dataFile:
+        exportIitYarp.exportDvs(dataFile, data, bottleNumber=0)
+        
 
 
 
@@ -666,36 +679,41 @@ def filePathGenerator(stemName='UndefinedStem', params: dict={}):
         str: The generated path.
     """
     # Build a path based on the stem name and the dictionary of parameters
-    path = stemName + '_'
+    path = stemName + '-'
     for key, value in params.items():
-        path += f'{key}={value}_'
+        path += f'{key}={value}-'
     return path
     
-class ProgressBar(object):
+class ProgressBar(object): 
     def __init__(self, toolbar_width=40):
         self.toolbar_width = toolbar_width
         self.ticks = 0
 
     def __call__(self, elapsed, complete, start, duration):
+        
+        elapsed_ = elapsed/second
+        hours = int(elapsed_ // 3600)
+        minutes = int((elapsed_ % 3600 // 60))
+        seconds = int(elapsed_ % 60)
+        time = f"\nElapsed (real-time): {hours:02d}:{minutes:02d}:{seconds:02d} - Completed: {complete*100:.2f}%"
+        
         if complete == 0.0:
             # setup toolbar
-            sys.stdout.write("[%s]" % (" " * self.toolbar_width))
-            sys.stdout.flush()
-            sys.stdout.write("\b" * (self.toolbar_width + 1)) # return to start of line, after '['
+            sys.stdout.write("\r[%s]"% (" " * self.toolbar_width) + time)
+            # sys.stdout.flush()
+            # Return to the start of the line, after '['
+            sys.stdout.write("\033[F") # Move cursor up one line
+            sys.stdout.write("\b" * (self.toolbar_width+1)) # return to start of line, after '['
+            
         else:
             ticks_needed = int(round(complete * self.toolbar_width))
             if self.ticks < ticks_needed:
-                elapsed_ = elapsed/second
-                hours = int(elapsed_ // 3600)
-                minutes = int((elapsed_ % 3600 // 60))
-                seconds = int(elapsed_ % 60)
-                time = f"Elapsed (real-time): {hours:02d}:{minutes:02d}:{seconds:02d} - Completed: {complete*100:.2f}%\n"
-                sys.stdout.write("-" * (ticks_needed-self.ticks) + '\n' + time)
+                sys.stdout.write("-" * (ticks_needed-self.ticks) + time)
                 sys.stdout.flush()
-                
+                # sys.stdout.write("\033[F") # Move cursor up one line
+                # sys.stdout.write("\b" * (ticks_needed-self.ticks+1))
                 self.ticks = ticks_needed
 
         if complete == 1.0:
-            sys.stdout.write("\n")
-
+            sys.stdout.write('\n')
 

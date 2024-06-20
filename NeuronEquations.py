@@ -3,9 +3,25 @@ dv/dt = (-v + In) / tau                                                         
 In =   SystIn  + ExtIn                                                            : 1
 SystIn = P * (Inh + Exc)                                                          : 1
 
-dExtIn/dt = -ExtIn / tauSpi                                                       : 1
-dInh/dt = -Inh / tauSpi                                                           : 1
-dExc/dt = -Exc / tauSpi                                                           : 1
+dExtIn/dt = -ExtIn / tau                                                       : 1
+dInh/dt = -Inh / tau                                                              : 1
+dExc/dt = -Exc / tau                                                              : 1
+
+incoming_spikes                                                                   : integer
+P                                                                                 : integer
+X                                                                                 : integer 
+Y                                                                                 : integer
+'''
+
+
+EQ_SCM_IFL = '''
+dv/dt = (-v + In) / tau                                                           : 1
+In =   SystIn  + ExtIn                                                            : 1
+SystIn = P * (Inh + Exc)                                                          : 1
+
+ExtIn                                                        : 1
+Inh                                                          : 1
+Exc                                                          : 1
 
 incoming_spikes                                                                   : integer
 P                                                                                 : integer
