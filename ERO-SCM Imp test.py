@@ -25,7 +25,7 @@ import pickle
 
 from bimvee import samplesToEvents as s2e
 from bimvee.importAe import importAe
-from EvCamDatabase import DAVIS_346B
+from EvCamDatabase import DAVIS_346B, ATIS_GEN3
 
 import os
 import gc
@@ -35,16 +35,22 @@ import time
 # -
 
 # XXX: Extract the event stream using bimvee - needs refactoring to be more general
-grid_width, grid_height= DAVIS_346B['width'], DAVIS_346B['height']
-filePath = 'MVSEC_short_outdoor'
+grid_width, grid_height= ATIS_GEN3['width'], ATIS_GEN3['height']
+filePath = 'massi'
 events = importAe(filePathOrName=filePath)
 
-try:
-    eventStream = events[0]['data']['left']['dvs']
-except:
-    eventStream = events[0]['data']['right']['dvs']
-eventStream.popitem()
-print()
+eventStream = events['data']['ch0']['dvs']
+
+
+# grid_width, grid_height= DAVIS_346B['width'], DAVIS_346B['height']
+# filePath = 'MVSEC_short_outdoor'
+# events = importAe(filePathOrName=filePath)
+# try:
+#     eventStream = events[0]['data']['left']['dvs']
+# except:
+#     eventStream = events[0]['data']['right']['dvs']
+# eventStream.popitem()
+# print()
 
 # ## Steps for the setting up the network:
 # 1. Generate the input spikes
@@ -67,7 +73,7 @@ print()
 # IMPORTANT NOTE: Output is float, so we need to convert to Quantities (i.e give them units)
 
 # Simulation Parameters
-defaultclock.dt = 0.5*ms
+defaultclock.dt = 0.001*ms
 samplePerc = 1.0
 SaveNumpyFrames = False
 GenerateGIFs = False
