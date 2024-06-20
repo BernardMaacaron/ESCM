@@ -73,8 +73,8 @@ eventStream = events['data']['ch0']['dvs']
 # IMPORTANT NOTE: Output is float, so we need to convert to Quantities (i.e give them units)
 
 # Simulation Parameters
-defaultclock.dt = 0.001*ms
-samplePerc = 1.0
+defaultclock.dt = 0.5*ms
+samplePerc = 0.002
 SaveNumpyFrames = False
 GenerateGIFs = False
 GenerateVideos = True
