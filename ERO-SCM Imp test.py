@@ -72,7 +72,11 @@ eventStream = events['data']['ch0']['dvs']
 
 # Simulation Parameters
 defaultclock.dt = 0.5*ms
+<<<<<<< HEAD
 samplePerc = 0.5
+=======
+samplePerc = 0.002
+>>>>>>> 6783334366294663af9fc1f668b33df67be1258a
 SaveNumpyFrames = False
 GenerateGIFs = False
 GenerateVideos = True
