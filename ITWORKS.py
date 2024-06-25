@@ -21,7 +21,9 @@ from brian2 import *
 import NeuronEquations
 import BrianHF
 import numpy as np
+import pickle
 
+from bimvee import samplesToEvents as s2e
 from bimvee.importAe import importAe
 from EvCamDatabase import DAVIS_346B, ATIS_GEN3
 
@@ -80,8 +82,9 @@ GenerateVideos = True
 GenerateInputVisuals = False
 GenerateOutputVisuals = False
 
+
 simTime, clockStep, inputSpikesGen = BrianHF.event_to_spike(eventStream, grid_width, grid_height,
-                                                            dt = defaultclock.dt, timeScale = 1.0, samplePercentage=samplePerc, interSpikeTiming=0.5)
+                                                            dt = defaultclock.dt, timeScale = 100.0, samplePercentage=samplePerc)
 # defaultclock.dt = clockStep*ms
 print("Input event stream successfully converted to spike trains\n")
 # -
@@ -131,9 +134,8 @@ outputStr = BrianHF.filePathGenerator('SCM_IF_OUT_TEMP', networkParams).replace(
 if not os.path.exists(resultPath):
     os.makedirs(resultPath)
 
-logPath = os.path.join('YarpSpikeLog', outputStr)
 # Create the subfolders if they don't exist
-subfolders = [logPath, 'spikeFrames', 'numpyFrames', 'gifs', 'videos']
+subfolders = ['YarpSpikeLog', 'spikeFrames', 'numpyFrames', 'gifs', 'videos']
 for subfolder in subfolders:
     subfolderPath = os.path.join(resultPath, subfolder)
     if not os.path.exists(subfolderPath):
@@ -346,9 +348,9 @@ if GenerateInputVisuals:
 
 
 print("Exporting Yarp Spike Log...")
-filename = os.path.join(resultPath, logPath, 'data.log')
+filename = os.path.join(resultPath, 'YarpSpikeLog', outputStr+'.log')
 if os.path.exists(filename):
-    filename = os.path.join(resultPath, logPath, f"data_{int(time.time())}.log")
+    filename = os.path.join(resultPath, 'YarpSpikeLog', f"{outputStr}_{int(time.time())}.log")
 BrianHF.generate_YarpDvs(spikeTimeStamps, spikeIndices, neuronsGrid, filename)
 
 

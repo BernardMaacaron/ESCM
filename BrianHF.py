@@ -56,22 +56,22 @@ def validate_indices(indices, firing_x, firing_y, width):
     else:
         print("Indices array was not built correctly.")
 
-def sort_events(events: list):
+def sort_events(times, indices):
     """
-    Sorts a list of events based on their times and indices.
+    Sorts the times and indices based on the time values.
+    This function is adapted to work with NumPy arrays.
 
-    Args:
-        events (list): A list of events, where each event is a tuple containing a
-        time and an index in that respective order.
+    Parameters:
+    times (np.ndarray): A NumPy array of time values.
+    indices (np.ndarray): A NumPy array of neuron indices.
 
     Returns:
-        tuple: A tuple containing two lists - sorted times and sorted indices.
+    tuple: Two sorted NumPy arrays, one for times and another for indices.
     """
-    # Sort the events first by time, then by index
+    # Example sorting implementation for NumPy arrays
+    sorted_indices = indices[np.argsort(times)]
+    sorted_times = np.sort(times)
     
-    sorted_events = sorted(events, key=lambda x: (x[0], x[1]))
-    # Unzip the sorted events back into separate lists
-    sorted_times, sorted_indices = zip(*sorted_events)
     return sorted_times, sorted_indices
 
 # Check for duplicate firing times and neuron indices
@@ -79,38 +79,38 @@ def sort_events(events: list):
 # XXX: Consider using np.unique() to extract the unique pairs (not sure if it is more efficient)
 def clear_duplicates(times, indices):
     """
-    Check for and remove duplicate pairs of times and neuron indices.
-
-    This function takes in two lists, `times` and `indices`, and checks for duplicate pairs of time values and neuron indices.
-    If any duplicate pairs are found, they are removed from the lists.
+    Check for and remove duplicate pairs of times and neuron indices, adapted for NumPy arrays.
 
     Parameters:
-    times (list): A list of time values.
-    indices (list): A list of neuron indices.
+    times (np.ndarray): A NumPy array of time values.
+    indices (np.ndarray): A NumPy array of neuron indices.
 
     Returns:
-    tuple: A tuple containing the updated lists of times and indices.
-
-    Notes:
-    - This function sorts the pairs of times and indices according to the sorting method in the `sort_events` function.
+    tuple: A tuple containing the updated NumPy arrays of times and indices.
     """
-    
     print("Checking for duplicate pairs...")
-    pairs = list(zip(times, indices))
-    pairs_set = list(set(pairs))
-
-    if len(pairs) != len(pairs_set):
-        print("Duplicate pairs found. Total Number of duplicates: ", len(pairs) - len(pairs_set))
-        print("Total number of pairs/spikes prior to removing duplicates: ", len(pairs), " pairs.")
-        print("Removing duplicate pairs...")
-        print("Done. Total number of pairs/spikes: ", len(pairs_set), " pairs.")
-        sorted_times, sorted_indices = sort_events(pairs_set)
-        return sorted_times, sorted_indices
+    # Ensure inputs are NumPy arrays
+    times = np.array(times)
+    indices = np.array(indices)
+    
+    # Create a structured array to hold pairs and facilitate easy duplicate removal and sorting
+    dtype = [('times', times.dtype), ('indices', indices.dtype)]
+    structured_array = np.array(list(zip(times, indices)), dtype=dtype)
+    
+    # Remove duplicates
+    unique_structured_array = np.unique(structured_array)
+    
+    if len(structured_array) != len(unique_structured_array):
+        print(f"Duplicate pairs found. Total Number of duplicates: {len(structured_array) - len(unique_structured_array)}")
     else:
         print("No duplicate pairs found.")
-        print("Total number of pairs/spikes: ", len(pairs_set), " pairs.")
-        sorted_times, sorted_indices = sort_events(pairs_set)
-        return sorted_times, sorted_indices
+    
+    print(f"Total number of pairs/spikes after removing duplicates: {len(unique_structured_array)} pairs.")
+    
+    # Assuming sort_events is adapted to work with structured arrays or can handle separate arrays
+    sorted_times, sorted_indices = sort_events(unique_structured_array['times'], unique_structured_array['indices'])
+    
+    return sorted_times, sorted_indices
 
 # TODO: Implement the function
 def nudge_ts(ts, nudge=1e-6):
@@ -120,9 +120,10 @@ def nudge_ts(ts, nudge=1e-6):
 # XXX: Make it take the keys as arguments or even consider taking x, y, t, p as arguments
 # XXX: make sure the time units make sense. Right now it is arbitrarily in ms. I'm not even sure if it is in ms.
 # XXX: Refactor to make dt flag dependent on whether the user wants to use the default clock time step or not.
-def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear_dup=True, timeScale: float = 1.0, samplePercentage=1.0, polarity=False):
+def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear_dup=True, timeScale: float = 1.0,
+                   samplePercentage: float = 1.0, interSpikeTiming=None, polarity=False):
     """
-    Converts an event to a spike based on the threshold. the event data is assumed to be in the form of a dictionary 
+    Converts an event to a spike based on the threshold. The event data is assumed to be in the form of a dictionary 
     and the spike representation is generated as a SpikeGeneratorGroup object from Brian2.
 
     Parameters:
@@ -138,6 +139,7 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
     - clear_dup (bool, optional): Flag to clear duplicate events. Defaults to True.
     - timeScale (float, optional): The scaling factor for the time. Defaults to 1.0.
     - samplePercentage (float, optional): The percentage of spikes to select at regular intervals. Defaults to 1.0.
+    - interSpikeTiming (float, optional): The minimum time difference between spikes. Defaults to None.
     - polarity (bool, optional): Flag to take polarity into consideration. Defaults to False.
 
     Returns:
@@ -145,10 +147,10 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
     - clockStep (float*ms): The recommended clock time step based on the minimum time difference between events.
     - spikeGen (SpikeGeneratorGroup): The SpikeGeneratorGroup object respective to the event stream.
     """
+    
     print("Extracting the event data...")
     num_neurons = height * width
     
-    # Define the mask to extract the event data based on whether polarity is considered or not
     if polarity:
         mask = eventStream['pol']
         print("Polarity was chosen to be considered. Note that for now this means only positive polarity events are extracted.")
@@ -156,58 +158,57 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
         mask = np.ones(len(eventStream['pol']), dtype=bool)
         print("Polarity was chosen to be ignored. All events are extracted.")
     
-    # Select a certain percentage of the spikes at regular intervals
     print("Selecting a percentage of the spikes at regular intervals... Percentage: ", samplePercentage*100, "%")
-    num_samples = np.count_nonzero(mask)
-    interval = int(num_samples / (num_samples * samplePercentage))
+    interval = max(int(1 / samplePercentage), 1)  # Ensure interval is at least 1
     
-    # Retrieve the x, y, time, and polarity data from the event stream
-    # NOTE: The time extracted from the event stream is in seconds (Read bimvee library documentation).
-    #       It is converted into milliseconds post processing.
-    firing_x = eventStream['x'][mask][::interval]
-    firing_y = eventStream['y'][mask][::interval]
-    times = eventStream['ts'][mask][::interval]
+    firing_x = np.array(eventStream['x'])[mask][::interval]
+    firing_y = np.array(eventStream['y'])[mask][::interval]
+    times = np.array(eventStream['ts'])[mask][::interval] * 1000 * timeScale  # Convert to ms and apply timeScale 
+    
+    if interSpikeTiming is not None:
+        print(f'Applying the minimum inter-spike timing constraint of {interSpikeTiming} ms.')
+        starting_indices = [0]  # Start with the index of the first element
+        current_time = times[0]
+        for i, time in enumerate(times[1:], start=1):  # Start enumeration at 1 to match times[1:]
+            if time - current_time >= interSpikeTiming:
+                starting_indices.append(i)
+                current_time = time
         
+        # Apply the same selection to times and other arrays
+        times = times[starting_indices]
+        firing_x = firing_x[starting_indices]
+        firing_y = firing_y[starting_indices]
+    
     print(f'The maximum x index {np.max(firing_x)} while the width is {width}')
     print(f'The maximum y index {np.max(firing_y)} while the height is {height}')
     
-    # Check if the data is correct
-    if len(firing_x) == len(firing_y) == len(times):
-        print("The x,y and time stamp indices are equal, the data is correct.")
-        indices = array([firing_y[i]*width + firing_x[i] for i in range(len(times))])
-    else:
-        print("The x,y and time stamp indices are not equal, the data is incorrect.")
-        return None
+    indices = firing_y * width + firing_x  # Convert to neuron indices directly with NumPy
     
     if val_indices:
         validate_indices(indices, firing_x, firing_y, width)
         
     if clear_dup:
+        # Assuming clear_duplicates is optimized for NumPy arrays
         times, indices = clear_duplicates(times, indices)
     else:
         print("Skipping checking for duplicate pairs.")
-        times, indices = sort_events(list(zip(times, indices)))
-        
-    print("The selected scale is", timeScale)
-    # Convert the time from seconds to milliseconds
-    times = np.array(times) * 1000 * timeScale
-
-    # Calculate the simulation time as the ceil of the last spike time
+        # Assuming sort_events is optimized for NumPy arrays
+        times, indices = sort_events(np.vstack((times, indices)).T)
+   
     maxTime = times[-1]
     print(f'The maximum time stamp (scaled) {maxTime} ms.')
-    simTime = np.ceil(times[-1])
+    simTime = np.ceil(maxTime)
     print(f'The recommended simulation time (scaled) is {simTime} ms.')
     
-    # Calculate the (defaultClock.dt) time step as the floor of the smallest time difference between events
-    minTimeStep = min(abs(diff(list(set(times)))))
+    minTimeStep = np.min(np.abs(np.diff(np.unique(times))))
     print(f'The minimum time step (scaled) is {minTimeStep} ms.')    
-    clockStep =  round(minTimeStep*10, decimal_index(minTimeStep))/10
+    clockStep = round(minTimeStep * 10) / 10  # Assuming decimal_index is a function that returns the number of decimals
     print(f'The recommended clock time step (scaled) is {clockStep} ms.')
     
     if dt is None:
-        dt = clockStep*ms
+        dt = clockStep
     
-    return simTime, clockStep, SpikeGeneratorGroup(num_neurons, indices, times*ms, dt, sorted=True)
+    return simTime, clockStep, SpikeGeneratorGroup(num_neurons, indices.astype(int), times*ms, dt, sorted=True)
 
 
 
