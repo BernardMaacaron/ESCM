@@ -3,7 +3,7 @@ dv/dt = (-v + In) / tau                                                         
 In =   SystIn  + ExtIn                                                            : 1
 SystIn = P * (Inh + Exc)                                                          : 1
 
-dExtIn/dt = -ExtIn / tau                                                       : 1
+dExtIn/dt = -ExtIn / tau                                                          : 1
 dInh/dt = -Inh / tau                                                              : 1
 dExc/dt = -Exc / tau                                                              : 1
 

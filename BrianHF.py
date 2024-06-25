@@ -120,8 +120,8 @@ def nudge_ts(ts, nudge=1e-6):
 # XXX: Make it take the keys as arguments or even consider taking x, y, t, p as arguments
 # XXX: make sure the time units make sense. Right now it is arbitrarily in ms. I'm not even sure if it is in ms.
 # XXX: Refactor to make dt flag dependent on whether the user wants to use the default clock time step or not.
-def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear_dup=True, timeScale: float = 1.0,
-                   samplePercentage: float = 1.0, interSpikeTiming=None, polarity=False):
+def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear_dup=True, polarity=False, timeScale: float = 1.0,
+                   samplePercentage: float = 1.0, interSpikeTiming=None):
     """
     Converts an event to a spike based on the threshold. The event data is assumed to be in the form of a dictionary 
     and the spike representation is generated as a SpikeGeneratorGroup object from Brian2.
@@ -644,6 +644,7 @@ def generate_video(frames, output_path, simTime: float):
 def generate_YarpDvs(spikeMon_time, spikeMon_index, NeuronGroup, path):
     x_list = NeuronGroup.X[spikeMon_index]
     y_list = NeuronGroup.Y[spikeMon_index]
+    
     data = {'ts': spikeMon_time, 'x': x_list, 'y': y_list, 'pol': ones(len(spikeMon_time), dtype=int)}
     with open(path, 'wb') as dataFile:
         exportIitYarp.exportDvs(dataFile, data, bottleNumber=0)

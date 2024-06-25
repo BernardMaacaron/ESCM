@@ -30,25 +30,24 @@ import gc
 import time
 
 # TODO XXX: Turn all lists into numpy arrays for the sake of memory efficiency
+
+# +
+# XXX: Extract the event stream using bimvee - needs refactoring to be more general
+# grid_width, grid_height= ATIS_GEN3['width'], ATIS_GEN3['height']
+# filePath = 'massi'
+# events = importAe(filePathOrName=filePath)
+# eventStream = events['data']['ch0']['dvs']
 # -
 
-# XXX: Extract the event stream using bimvee - needs refactoring to be more general
-grid_width, grid_height= ATIS_GEN3['width'], ATIS_GEN3['height']
-filePath = 'massi'
+grid_width, grid_height= DAVIS_346B['width'], DAVIS_346B['height']
+filePath = 'MVSEC_short_outdoor'
 events = importAe(filePathOrName=filePath)
-
-eventStream = events['data']['ch0']['dvs']
-
-
-# grid_width, grid_height= DAVIS_346B['width'], DAVIS_346B['height']
-# filePath = 'MVSEC_short_outdoor'
-# events = importAe(filePathOrName=filePath)
-# try:
-#     eventStream = events[0]['data']['left']['dvs']
-# except:
-#     eventStream = events[0]['data']['right']['dvs']
-# eventStream.popitem()
-# print()
+try:
+    eventStream = events[0]['data']['left']['dvs']
+except:
+    eventStream = events[0]['data']['right']['dvs']
+eventStream.popitem()
+print()
 
 # ## Steps for the setting up the network:
 # 1. Generate the input spikes
@@ -72,11 +71,7 @@ eventStream = events['data']['ch0']['dvs']
 
 # Simulation Parameters
 defaultclock.dt = 0.5*ms
-<<<<<<< HEAD
-samplePerc = 0.5
-=======
-samplePerc = 0.002
->>>>>>> 6783334366294663af9fc1f668b33df67be1258a
+samplePerc = 1.0
 SaveNumpyFrames = False
 GenerateGIFs = False
 GenerateVideos = True
@@ -85,7 +80,7 @@ GenerateInputVisuals = False
 GenerateOutputVisuals = False
 
 simTime, clockStep, inputSpikesGen = BrianHF.event_to_spike(eventStream, grid_width, grid_height,
-                                                            dt = defaultclock.dt, timeScale = 1.0, samplePercentage=samplePerc, interSpikeTiming=0.5)
+                                                            dt = defaultclock.dt, timeScale = 1.0, samplePercentage=samplePerc, interSpikeTiming=None)
 # defaultclock.dt = clockStep*ms
 print("Input event stream successfully converted to spike trains\n")
 # -
@@ -114,7 +109,7 @@ Eqs_Neurons = NeuronEquations.EQ_SCM_IF    # Neurons Equation
 Neighborhood Size (num_Neighbors) - Affects the number of neighbors a central neuron based on the L1 Distance
 Neighboring Neurons --> (abs(X_pre - X_post) <= Num_Neighbours  and abs(Y_pre - Y_post) <= Num_Neighbours)
 '''
-Syn_Params = {'Num_Neighbours' : 8, 'beta': 0.5, 'Wi': 6, 'Wk': -0.9, 'method_Syn': 'exact'}
+Syn_Params = {'Num_Neighbours' : 8, 'beta': 0.5, 'Wi': 6.15, 'Wk': -10, 'method_Syn': 'exact'}
 Num_Neighbours = Syn_Params['Num_Neighbours']
 beta = Syn_Params['beta']
 Wi = Syn_Params['Wi']
@@ -197,7 +192,7 @@ Syn_Neurons_Neurons = Synapses(neuronsGrid, neuronsGrid,
                                ''',
                                on_pre={
                                    'pre':'incoming_spikes_post += 1; Exc_pre = Wi',
-                                   'pre_2': 'Inh_post = P_post * clip(Inh_post + Wk * incoming_spikes_post/N_outgoing, Wk, 0)'},
+                                   'pre_2': 'Inh_post = P_post * Wk * incoming_spikes_post'},
                                method= 'exact',
                                namespace=Syn_Params)
 # -
@@ -240,7 +235,8 @@ if GenerateInputVisuals:
 # +
 BrianLogger.log_level_error()    # Only log errors to avoid excessive output
 
-N = 20  # Number of runs
+warn = ''
+N = 10  # Number of runs
 run_time = simTime / N  # Duration of each run
 spikeTimeStamps = np.array([])
 spikeIndices = np.array([], dtype=int)
@@ -250,14 +246,14 @@ spikeIndices = np.array([], dtype=int)
 
 print("Starting simulation - Total time: ", simTime*ms)
 for i in range(N):
-    print(f"Running simulation chunk {i+1}/{N} for {run_time} ms")
+    print(f"\nRunning simulation chunk {i+1}/{N} for {run_time} ms")
     SpikeMon_Neurons = SpikeMonitor(neuronsGrid)    # Monitor the spikes from the neuron grid
     
     if 'ipykernel' in sys.modules:
         # Running in a Jupyter notebook
         print("Running in a Jupyter notebook")
         reportVar = 'text'
-        report_periodVar = None
+        report_periodVar = 5*second
     else:
         # Not running in a Jupyter notebook
         print("Not running in a Jupyter notebook")
@@ -265,11 +261,12 @@ for i in range(N):
         report_periodVar = 2*second
     
     FailedSim = False
+        
     try:
         run(run_time*ms, report=reportVar, report_period=report_periodVar, profile=False)
         # print(profiling_summary())
     except Exception as e:
-        print("Simulation failed:", str(e))
+        print("Simulation failed:", str(e), '\n')
         print("Trying to re-run by dividing the time into smaller chunks\n")
         N_inner = 5
         run_time_inner = run_time / N_inner
@@ -279,7 +276,7 @@ for i in range(N):
                 run(run_time_inner*ms, report=reportVar, report_period=report_periodVar, profile=False)
             except Exception as e_inner:
                 print("Simulation failed:", str(e_inner))
-                print("WARNING: The results may be incomplete")
+                warn = " - WARNING: The results may be incomplete"
                 FailedSim = True
                 break
         if not FailedSim:
@@ -297,16 +294,18 @@ for i in range(N):
 # with open(filename, 'w') as f:
 #     pickle.dump(data, f)
 # del data
-print("Simulation complete\n")
+print("Simulation complete",warn,"\n")
 
 # -
 
 # #### _9. (Optional) Visualize the results_
 
+# +
 # print("Generating Visualizable Outputs:")
 # BrianHF.visualise_connectivity(Syn_Input_Neurons)
 # BrianHF.visualise_spikes([SpikeMon_Input, SpikeMon_Neurons])
 # BrianHF.visualise_spike_difference(SpikeMon_Input, SpikeMon_Neurons)
+# -
 
 
 # Generate the frames for input
@@ -347,7 +346,6 @@ if GenerateInputVisuals:
     del inputFrames
     del SpikeMon_Input
     gc.collect()
-
 
 print("Exporting Yarp Spike Log...")
 filename = os.path.join(resultPath, logPath, 'data.log')
