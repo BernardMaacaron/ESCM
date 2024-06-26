@@ -6,6 +6,7 @@ import cv2
 import imageio
 from bimvee import exportIitYarp
 from brian2 import *
+import numpy as np
 
 # # Figures mpl style
 # axes.linewidth : 1
@@ -182,7 +183,16 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
     print(f'The maximum x index {np.max(firing_x)} while the width is {width}')
     print(f'The maximum y index {np.max(firing_y)} while the height is {height}')
     
-    indices = firing_y * width + firing_x  # Convert to neuron indices directly with NumPy
+    if len(firing_x) == len(firing_y) == len(times):
+        print("The x,y and time stamp indices are equal, the data is correct.")
+        
+        # TODO XXX FIXME: the commented out numpy implementation is not working. Need to understand why.
+        # indices = firing_y * width + firing_x  # Convert to neuron indices directly with NumPy
+        indices = np.array([firing_y[i]*width + firing_x[i] for i in range(len(times))])
+
+    else:
+        print("The x,y and time stamp indices are not equal, the data is incorrect.")
+        return None
     
     if val_indices:
         validate_indices(indices, firing_x, firing_y, width)

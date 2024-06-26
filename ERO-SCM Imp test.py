@@ -23,7 +23,7 @@ import BrianHF
 import numpy as np
 
 from bimvee.importAe import importAe
-from EvCamDatabase import DAVIS_346B, ATIS_GEN3
+from EvCamDatabase import DAVIS_346B
 
 import os
 import gc
@@ -70,7 +70,7 @@ print()
 # IMPORTANT NOTE: Output is float, so we need to convert to Quantities (i.e give them units)
 
 # Simulation Parameters
-defaultclock.dt = 0.5*ms
+defaultclock.dt = 0.1*ms
 samplePerc = 1.0
 SaveNumpyFrames = False
 GenerateGIFs = False
@@ -94,9 +94,8 @@ print("Input event stream successfully converted to spike trains\n")
 # Neuron Parameters
 N_Neurons = grid_width * grid_height    # Number of neurons
 
-Neuron_Params = {'tau': 0.2*ms, 'tauSpi': 0*ms, 'vt': 0.1, 'vr': 0.0, 'P': 0, 'incoming_spikes': 0, 'method_Neuron': 'exact'}
+Neuron_Params = {'tau': 0.2*ms, 'vt': 0.1, 'vr': 0.0, 'P': 0, 'incoming_spikes': 0, 'method_Neuron': 'exact'}
 tau = Neuron_Params['tau']
-tauSpi = Neuron_Params['tauSpi']
 vt = Neuron_Params['vt']
 vr = Neuron_Params['vr']
 P = Neuron_Params['P']
@@ -109,7 +108,7 @@ Eqs_Neurons = NeuronEquations.EQ_SCM_IF    # Neurons Equation
 Neighborhood Size (num_Neighbors) - Affects the number of neighbors a central neuron based on the L1 Distance
 Neighboring Neurons --> (abs(X_pre - X_post) <= Num_Neighbours  and abs(Y_pre - Y_post) <= Num_Neighbours)
 '''
-Syn_Params = {'Num_Neighbours' : 8, 'beta': 0.5, 'Wi': 6.15, 'Wk': -10, 'method_Syn': 'exact'}
+Syn_Params = {'Num_Neighbours' : 8, 'beta': 0.4, 'Wi': 0.6, 'Wk': -4.25, 'method_Syn': 'exact'}
 Num_Neighbours = Syn_Params['Num_Neighbours']
 beta = Syn_Params['beta']
 Wi = Syn_Params['Wi']
@@ -117,6 +116,7 @@ Wk = Syn_Params['Wk']
 
 # Generate the dictionary of parameters for the network
 networkParams = {**Neuron_Params, **Syn_Params, 'Sim_Clock': defaultclock.dt, 'Sample_Perc': samplePerc}
+display(networkParams)
 # -
 
 # ### 3. Prepare the directory structure for saving the results
@@ -261,39 +261,38 @@ for i in range(N):
         report_periodVar = 2*second
     
     FailedSim = False
+    
+    run(run_time*ms, report=reportVar, report_period=report_periodVar, profile=False)
+
         
-    try:
-        run(run_time*ms, report=reportVar, report_period=report_periodVar, profile=False)
-        # print(profiling_summary())
-    except Exception as e:
-        print("Simulation failed:", str(e), '\n')
-        print("Trying to re-run by dividing the time into smaller chunks\n")
-        N_inner = 5
-        run_time_inner = run_time / N_inner
-        for j in range(N_inner):
-            print(f"Running INNER simulation chunk {j+1}/{N_inner} for {run_time_inner} ms")
-            try:
-                run(run_time_inner*ms, report=reportVar, report_period=report_periodVar, profile=False)
-            except Exception as e_inner:
-                print("Simulation failed:", str(e_inner))
-                warn = " - WARNING: The results may be incomplete"
-                FailedSim = True
-                break
-        if not FailedSim:
-            break
+    # try:
+    #     run(run_time*ms, report=reportVar, report_period=report_periodVar, profile=False)
+    #     # print(profiling_summary())
+    # except Exception as e:
+    #     print("Simulation failed:", str(e), '\n')
+    #     print("Trying to re-run by dividing the time into smaller chunks\n")
+    #     N_inner = 5
+    #     run_time_inner = run_time / N_inner
+    #     for j in range(N_inner):
+    #         print(f"Running INNER simulation chunk {j+1}/{N_inner} for {run_time_inner} ms")
+    #         try:
+    #             run(run_time_inner*ms, report=reportVar, report_period=report_periodVar, profile=False)
+    #         except Exception as e_inner:
+    #             print("Simulation failed:", str(e_inner))
+    #             warn = " - WARNING: The results may be incomplete"
+    #             FailedSim = True
+    #             break
+    #     if not FailedSim:
+    #         break
         
         
     if SpikeMon_Neurons.num_spikes > 0:
         spikeTimeStamps = np.append(spikeTimeStamps, SpikeMon_Neurons.t[:])
         spikeIndices = np.append(spikeIndices, SpikeMon_Neurons.i[:])
+    
     del SpikeMon_Neurons
     gc.collect()
     
-# data = {'spikeTimeStamps': spikeTimeStamps, 'spikeIndices': spikeIndices}
-# filename = os.path.join(resultPath, 'spikeFrames', outputStr+'.data')
-# with open(filename, 'w') as f:
-#     pickle.dump(data, f)
-# del data
 print("Simulation complete",warn,"\n")
 
 # -
@@ -346,6 +345,7 @@ if GenerateInputVisuals:
     del inputFrames
     del SpikeMon_Input
     gc.collect()
+
 
 print("Exporting Yarp Spike Log...")
 filename = os.path.join(resultPath, logPath, 'data.log')
