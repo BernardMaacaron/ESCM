@@ -695,7 +695,25 @@ def filePathGenerator(stemName='UndefinedStem', params: dict={}):
     for key, value in params.items():
         path += f'{key}={value}-'
     return path
-    
+ 
+def find_keys(data, target_key):
+    """
+    Recursively search for keys in a nested data structure.
+
+    :param data: The data structure to search through.
+    :param target_key: The key to search for.
+    :return: A list of values associated with the target key.
+    """
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if key == target_key:
+                yield value
+            elif isinstance(value, (dict, list)):
+                yield from find_keys(value, target_key)
+    elif isinstance(data, list):
+        for item in data:
+            yield from find_keys(item, target_key)
+   
 class ProgressBar(object): 
     def __init__(self, toolbar_width=40):
         self.toolbar_width = toolbar_width
