@@ -117,18 +117,80 @@ def clear_duplicates(times, indices):
 def nudge_ts(ts, nudge=1e-6):
     return None
 
+
+def IST_sampler(interSpikeTiming, firing_x, firing_y, times):
+    """
+    Selects spikes with an inter-spike timing difference greater than or equal to a given value.
+
+    Args:
+        interSpikeTiming (float): The minimum inter-spike timing difference in milliseconds.
+        firing_x (ndarray): Array containing the x-coordinates of the firing events.
+        firing_y (ndarray): Array containing the y-coordinates of the firing events.
+        times (ndarray): Array containing the timestamps of the firing events.
+
+    Returns:
+        Tuple[ndarray, ndarray, ndarray]: A tuple containing the selected firing_x, firing_y, and times arrays.
+    """
+    print(f'Sampling all spikes with an inter-spike timing difference of {interSpikeTiming} ms.')
+    starting_indices = [0]  # Start with the index of the first element
+    current_time = times[0]
+    for i, time in enumerate(times[1:], start=1):  # Start enumeration at 1 to match times[1:]
+        if time - current_time >= interSpikeTiming:
+            starting_indices.append(i)
+            current_time = time
+        
+    # Apply the same selection to times and other arrays
+    times = times[starting_indices]
+    firing_x = firing_x[starting_indices]
+    firing_y = firing_y[starting_indices]
+    return firing_x, firing_y, times
+
+def IST_padder(interSpikeTiming, times):
+    """
+    Pad all spikes to bins of inter-spike timing difference.
+
+    Args:
+        interSpikeTiming (int): The desired inter-spike timing difference in milliseconds.
+        times (numpy.ndarray): An array of spike timestamps.
+
+    Returns:
+        numpy.ndarray: An array of batched timestamps with padded spikes.
+
+    """
+    print(f'Padding all spikes to bins of inter-spike timing difference of {interSpikeTiming} ms.')
+    diffs = times % interSpikeTiming
+    batch_starts_indices = np.where(diffs == 0)[0]      # Find indices where a new batch starts
+    batched_times = np.zeros_like(times)        # Create an array to hold the batched timestamps
+    
+    # Check if there are any batch starts
+    if len(batch_starts_indices) > 0:
+        np.put_along_axis(batched_times, batch_starts_indices, times[batch_starts_indices], axis=0)     # Fill the array with the start of each batch
+        valid_starts = times[batch_starts_indices]         # For indices that are not the start of a new batch, forward-fill with the previous batch start
+        for i in range(1, len(valid_starts)):
+            batched_times[batch_starts_indices[i-1]:batch_starts_indices[i]] = valid_starts[i-1]
+        batched_times[batch_starts_indices[-1]:] = valid_starts[-1]
+    else:
+        # If no batch starts are found, return the original times
+        batched_times = times
+
+    return batched_times
+
+    
 # Convert the event camera data to spikes
 # XXX: Make it take the keys as arguments or even consider taking x, y, t, p as arguments
 # XXX: make sure the time units make sense. Right now it is arbitrarily in ms. I'm not even sure if it is in ms.
 # XXX: Refactor to make dt flag dependent on whether the user wants to use the default clock time step or not.
+import numpy as np
+from brian2 import SpikeGeneratorGroup, ms
+
 def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear_dup=True, polarity=False, timeScale: float = 1.0,
                    samplePercentage: float = 1.0, interSpikeTiming=None):
     """
-    Converts an event to a spike based on the threshold. The event data is assumed to be in the form of a dictionary 
+    Converts an event stream to a spike representation. The event data is assumed to be in the form of a dictionary 
     and the spike representation is generated as a SpikeGeneratorGroup object from Brian2.
 
     Parameters:
-    - eventStream (dictionary): The event stream data. The keys are 'x', 'y', 'ts', and 'p'.
+    - eventStream (dictionary): The event stream data. The keys are 'x', 'y', 'ts', and 'pol'.
                                 The values are lists of the respective data.
                                 'x' and 'y' are the pixel coordinates (integers)
                                 'ts' is the time (float)
@@ -146,7 +208,7 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
     Returns:
     - simTime (float*ms): The recommended simulation time that spans all spike times.
     - clockStep (float*ms): The recommended clock time step based on the minimum time difference between events.
-    - spikeGen (SpikeGeneratorGroup): The SpikeGeneratorGroup object respective to the event stream.
+    - spikeGen (SpikeGeneratorGroup): The SpikeGeneratorGroup object corresponding to the event stream.
     """
     
     print("Extracting the event data...")
@@ -154,10 +216,10 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
     
     if polarity:
         mask = eventStream['pol']
-        print("Polarity was chosen to be considered. Note that for now this means only positive polarity events are extracted.")
+        print("Polarity is considered. Note that for now this means only positive polarity events are extracted.")
     else:
         mask = np.ones(len(eventStream['pol']), dtype=bool)
-        print("Polarity was chosen to be ignored. All events are extracted.")
+        print("Polarity is ignored. All events are extracted.")
     
     print("Selecting a percentage of the spikes at regular intervals... Percentage: ", samplePercentage*100, "%")
     interval = max(int(1 / samplePercentage), 1)  # Ensure interval is at least 1
@@ -167,31 +229,17 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
     times = np.array(eventStream['ts'])[mask][::interval] * 1000 * timeScale  # Convert to ms and apply timeScale 
     
     if interSpikeTiming is not None:
-        print(f'Applying the minimum inter-spike timing constraint of {interSpikeTiming} ms.')
-        starting_indices = [0]  # Start with the index of the first element
-        current_time = times[0]
-        for i, time in enumerate(times[1:], start=1):  # Start enumeration at 1 to match times[1:]
-            if time - current_time >= interSpikeTiming:
-                starting_indices.append(i)
-                current_time = time
-        
-        # Apply the same selection to times and other arrays
-        times = times[starting_indices]
-        firing_x = firing_x[starting_indices]
-        firing_y = firing_y[starting_indices]
+        firing_x, firing_y, times = IST_padder(interSpikeTiming, firing_x, firing_y, times)
     
     print(f'The maximum x index {np.max(firing_x)} while the width is {width}')
     print(f'The maximum y index {np.max(firing_y)} while the height is {height}')
     
     if len(firing_x) == len(firing_y) == len(times):
-        print("The x,y and time stamp indices are equal, the data is correct.")
+        print("The x, y, and timestamp indices are equal, the data is correct.")
         
-        # TODO XXX FIXME: the commented out numpy implementation is not working. Need to understand why.
-        # indices = firing_y * width + firing_x  # Convert to neuron indices directly with NumPy
         indices = np.array([firing_y[i]*width + firing_x[i] for i in range(len(times))])
-
     else:
-        print("The x,y and time stamp indices are not equal, the data is incorrect.")
+        print("The x, y, and timestamp indices are not equal, the data is incorrect.")
         return None
     
     if val_indices:
@@ -206,7 +254,7 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
         times, indices = sort_events(np.vstack((times, indices)).T)
    
     maxTime = times[-1]
-    print(f'The maximum time stamp (scaled) {maxTime} ms.')
+    print(f'The maximum timestamp (scaled) {maxTime} ms.')
     simTime = np.ceil(maxTime)
     print(f'The recommended simulation time (scaled) is {simTime} ms.')
     
@@ -219,7 +267,6 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
         dt = clockStep
     
     return simTime, clockStep, SpikeGeneratorGroup(num_neurons, indices.astype(int), times*ms, dt, sorted=True)
-
 
 
 
