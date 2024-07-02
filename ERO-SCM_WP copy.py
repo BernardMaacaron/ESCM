@@ -112,11 +112,11 @@ Eqs_Neurons = NeuronEquations.EQ_SCM_IF    # Neurons Equation
 Neighborhood Size (num_Neighbors) - Affects the number of neighbors a central neuron based on the L1 Distance
 Neighboring Neurons --> (abs(X_pre - X_post) <= Num_Neighbours  and abs(Y_pre - Y_post) <= Num_Neighbours)
 '''
-Syn_Params = {'Num_Neighbours' : 8, 'beta': 0.5, 'Wi': 6.0, 'Wk': -3.0, 'method_Syn': 'exact'}
+Syn_Params = {'Num_Neighbours' : 8, 'beta': 0.5, 'W_Exc': 6.0, 'W_Inh': -0.01, 'method_Syn': 'exact'}
 Num_Neighbours = Syn_Params['Num_Neighbours']
 beta = Syn_Params['beta']
-Wi = Syn_Params['Wi']
-Wk = Syn_Params['Wk']
+W_Exc = Syn_Params['W_Exc']
+W_Inh = Syn_Params['W_Inh']
 
 # Generate the dictionary of parameters for the network
 networkParams = {**Neuron_Params, **Syn_Params, 'Sim_Clock': defaultclock.dt, 'Sample_Perc': samplePerc}
@@ -153,7 +153,7 @@ neuronsGrid = NeuronGroup(N_Neurons, Eqs_Neurons, threshold='v>vt',
                             v = vr
                             incoming_spikes_post = 0
                             ''',
-                            refractory='0.01*ms',
+                            refractory='0*ms',
                             events={'P_ON': 'v > vt', 'P_OFF': '(timestep(t - lastspike, dt) > timestep(dt, dt) and v <= vt)'},
                             method= Neuron_Params['method_Neuron'],
                             namespace=Neuron_Params)
@@ -190,12 +190,12 @@ Syn_Input_Neurons = Synapses(inputSpikesGen, neuronsGrid,
 # NOTE: In hopes of reducing simulation time, I am using _pre keyword to avoid the need for an autapse. Hence only one Synapse group is needed
 Syn_Neurons_Neurons = Synapses(neuronsGrid, neuronsGrid,
                                '''
-                               Wi : 1
-                               Wk : 1
+                               W_Exc : 1
+                               W_Inh : 1
                                ''',
                                on_pre={
-                                   'pre':'incoming_spikes_post += 1; Exc_pre = Wi',
-                                   'pre_2': 'Inh_post = P_post * Wk * incoming_spikes_post'},
+                                   'pre':'incoming_spikes_post += 1; Exc_pre = W_Exc',
+                                   'pre_2': 'Inh_post += P_post * W_Inh'},
                                method= 'exact',
                                namespace=Syn_Params)
 # -
@@ -215,8 +215,8 @@ The code below is a faster implementation of:
 
 indexes_i, indexes_j = BrianHF.calculate_ChebyshevNeighbours(neuronsGrid, Num_Neighbours)
 Syn_Neurons_Neurons.connect(i=indexes_i, j=indexes_j)
-Syn_Neurons_Neurons.Wi = Wi
-Syn_Neurons_Neurons.Wk = Wk
+Syn_Neurons_Neurons.W_Exc = W_Exc
+Syn_Neurons_Neurons.W_Inh = W_Inh
 # -
 
 print('Synapse Connections created successfully\n')
@@ -239,7 +239,7 @@ if GenerateInputVisuals:
 BrianLogger.log_level_error()    # Only log errors to avoid excessive output
 
 warn = ''
-N = 10  # Number of runs
+N = 20  # Number of runs
 run_time = simTime / N  # Duration of each run
 spikeTimeStamps = np.array([])
 spikeIndices = np.array([], dtype=int)
