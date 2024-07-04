@@ -180,8 +180,6 @@ def IST_padder(interSpikeTiming, times):
 # XXX: Make it take the keys as arguments or even consider taking x, y, t, p as arguments
 # XXX: make sure the time units make sense. Right now it is arbitrarily in ms. I'm not even sure if it is in ms.
 # XXX: Refactor to make dt flag dependent on whether the user wants to use the default clock time step or not.
-import numpy as np
-from brian2 import SpikeGeneratorGroup, ms
 
 def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear_dup=True, polarity=False, timeScale: float = 1.0,
                    samplePercentage: float = 1.0, interSpikeTiming=None):
@@ -229,7 +227,7 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
     times = np.array(eventStream['ts'])[mask][::interval] * 1000 * timeScale  # Convert to ms and apply timeScale 
     
     if interSpikeTiming is not None:
-        firing_x, firing_y, times = IST_padder(interSpikeTiming, firing_x, firing_y, times)
+        times = IST_padder(interSpikeTiming, times)
     
     print(f'The maximum x index {np.max(firing_x)} while the width is {width}')
     print(f'The maximum y index {np.max(firing_y)} while the height is {height}')
@@ -786,9 +784,9 @@ class ProgressBar(object):
             ticks_needed = int(round(complete * self.toolbar_width))
             if self.ticks < ticks_needed:
                 sys.stdout.write("-" * (ticks_needed-self.ticks) + time)
-                sys.stdout.flush()
-                # sys.stdout.write("\033[F") # Move cursor up one line
-                # sys.stdout.write("\b" * (ticks_needed-self.ticks+1))
+                # sys.stdout.flush()
+                sys.stdout.write("\033[F") # Move cursor up one line
+                sys.stdout.write("\b" * (ticks_needed-self.ticks+1))
                 self.ticks = ticks_needed
 
         if complete == 1.0:
