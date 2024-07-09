@@ -44,7 +44,7 @@ inputDict = {'Directions_HPE': 'h36m_sample/cam2_S1_Directions/ch0dvs',
              'MVSEC_Outdoor': 'MVSEC_short_outdoor',
              'User5_ET': 'EyeTracking/user_5_0/ch0dvs'}
 
-inputPath = inputDict['Directions_HPE']
+inputPath = inputDict['User5_ET']
 events = importAe(filePathOrName=os.path.join('InputData',inputPath))
 # -
 
@@ -121,7 +121,7 @@ Eqs_Neurons = NeuronEquations.EQ_SCM_IF    # Neurons Equation
 Neighborhood Size (num_Neighbors) - Affects the number of neighbors a central neuron based on the L1 Distance
 Neighboring Neurons --> (abs(X_pre - X_post) <= Num_Neighbours  and abs(Y_pre - Y_post) <= Num_Neighbours)
 '''
-Syn_Params = {'Num_Neighbours' : 20, 'beta': 0.5, 'Wi': 6.0, 'Wk': -3.0, 'method_Syn': 'exact'}
+Syn_Params = {'Num_Neighbours' : 35, 'beta': 0.5, 'Wi': 6.0, 'Wk': -3.0, 'method_Syn': 'exact'}
 Num_Neighbours = Syn_Params['Num_Neighbours']
 beta = Syn_Params['beta']
 Wi = Syn_Params['Wi']
