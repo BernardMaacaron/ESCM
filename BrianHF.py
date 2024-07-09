@@ -759,8 +759,9 @@ def find_keys(data, target_key):
         for item in data:
             yield from find_keys(item, target_key)
    
+# XXX TODO: Needs fixing so that the output is exactly what we want. The current implementation is not correct.
 class ProgressBar(object): 
-    def __init__(self, toolbar_width=40):
+    def __init__(self, toolbar_width=50):
         self.toolbar_width = toolbar_width
         self.ticks = 0
 
