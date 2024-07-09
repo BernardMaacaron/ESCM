@@ -778,17 +778,18 @@ class ProgressBar(object):
             # sys.stdout.flush()
             # Return to the start of the line, after '['
             sys.stdout.write("\033[F") # Move cursor up one line
-            sys.stdout.write("\b" * (self.toolbar_width+1)) # return to start of line, after '['
+            # sys.stdout.write("\b" * (self.toolbar_width+1)) # return to start of line, after '['
             
         else:
             ticks_needed = int(round(complete * self.toolbar_width))
             if self.ticks < ticks_needed:
-                sys.stdout.write("-" * (ticks_needed-self.ticks) + time)
+                current_ticks = ticks_needed-self.ticks
+                sys.stdout.write("-" * current_ticks + time)
                 # sys.stdout.flush()
                 sys.stdout.write("\033[F") # Move cursor up one line
-                sys.stdout.write("\b" * (ticks_needed-self.ticks+1))
+                # sys.stdout.write("\b" * (ticks_needed-self.ticks))
                 self.ticks = ticks_needed
 
         if complete == 1.0:
-            sys.stdout.write('\n')
+            sys.stdout.write('\n\n')
 

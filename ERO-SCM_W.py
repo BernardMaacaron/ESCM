@@ -28,6 +28,7 @@ from EvCamDatabase import *
 import os
 import gc
 import time
+import datetime
 
 # TODO XXX: Turn all lists into numpy arrays for the sake of memory efficiency
 # -
@@ -112,7 +113,7 @@ Eqs_Neurons = NeuronEquations.EQ_SCM_IF    # Neurons Equation
 Neighborhood Size (num_Neighbors) - Affects the number of neighbors a central neuron based on the L1 Distance
 Neighboring Neurons --> (abs(X_pre - X_post) <= Num_Neighbours  and abs(Y_pre - Y_post) <= Num_Neighbours)
 '''
-Syn_Params = {'Num_Neighbours' : 8, 'beta': 0.5, 'Wi': 6.0, 'Wk': -3.0, 'method_Syn': 'exact'}
+Syn_Params = {'Num_Neighbours' : 50, 'beta': 0.5, 'Wi': 6.0, 'Wk': -3.0, 'method_Syn': 'exact'}
 Num_Neighbours = Syn_Params['Num_Neighbours']
 beta = Syn_Params['beta']
 Wi = Syn_Params['Wi']
@@ -133,7 +134,9 @@ outputStr = BrianHF.filePathGenerator('SCM_LIF_OUT', networkParams).replace(" ",
 if not os.path.exists(resultPath):
     os.makedirs(resultPath)
 
-logPath = os.path.join('YarpSpikeLog', outputStr)
+current_time = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+logPath = os.path.join('YarpSpikeLog', outputStr, f"data_{current_time}")
+
 # Create the subfolders if they don't exist
 subfolders = ['spikeFrames', 'numpyFrames', 'gifs', 'videos', logPath]
 for subfolder in subfolders:
@@ -153,7 +156,7 @@ neuronsGrid = NeuronGroup(N_Neurons, Eqs_Neurons, threshold='v>vt',
                             v = vr
                             incoming_spikes_post = 0
                             ''',
-                            refractory='0.01*ms',
+                            refractory='0.0*ms',
                             events={'P_ON': 'v > vt', 'P_OFF': '(timestep(t - lastspike, dt) > timestep(dt, dt) and v <= vt)'},
                             method= Neuron_Params['method_Neuron'],
                             namespace=Neuron_Params)
@@ -351,9 +354,7 @@ if GenerateInputVisuals:
 
 
 print("Exporting Yarp Spike Log...")
-filename = os.path.join(resultPath, inputPath, logPath, 'data.log')
-if os.path.exists(filename):
-    filename = os.path.join(resultPath, inputPath, logPath, f"data_{int(time.time())}.log")
+filename = os.path.join(resultPath, inputPath, logPath,"data.log")
 BrianHF.generate_YarpDvs(spikeTimeStamps, spikeIndices, neuronsGrid, filename)
 
 
