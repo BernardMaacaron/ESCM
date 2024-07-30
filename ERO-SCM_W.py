@@ -37,14 +37,14 @@ import datetime
 
 # +
 # XXX: Extract the event stream using bimvee - needs refactoring to be more general
-grid_width, grid_height= IDNW['width'], IDNW['height']
+grid_width, grid_height= DAVIS_346B['width'], DAVIS_346B['height']
 inputDict = {'Directions_HPE': 'h36m_sample/cam2_S1_Directions/ch0dvs',
              'Photos_HPE': 'h36m_sample/cam2_S1_TakingPhoto_1/ch0dvs',
              'Posing_HPE': 'h36m_sample/cam2_S5_Posing/ch0dvs',
              'MVSEC_Outdoor': 'MVSEC_short_outdoor',
-             'User5_ET': 'EyeTracking/user_5_0/ch0dvs'}
+             'User5_1_ET': 'EyeTracking/user_5_1/ch0dvs_old'}
 
-inputPath = inputDict['User5_ET']
+inputPath = inputDict['User5_1_ET']
 events = importAe(filePathOrName=os.path.join('InputData',inputPath))
 # -
 
@@ -121,7 +121,7 @@ Eqs_Neurons = NeuronEquations.EQ_SCM_IF    # Neurons Equation
 Neighborhood Size (num_Neighbors) - Affects the number of neighbors a central neuron based on the L1 Distance
 Neighboring Neurons --> (abs(X_pre - X_post) <= Num_Neighbours  and abs(Y_pre - Y_post) <= Num_Neighbours)
 '''
-Syn_Params = {'Num_Neighbours' : 35, 'beta': 0.5, 'Wi': 6.0, 'Wk': -3.0, 'method_Syn': 'exact'}
+Syn_Params = {'Num_Neighbours' : 20, 'beta': 0.5, 'Wi': 6.0, 'Wk': -0.5, 'method_Syn': 'exact'}
 Num_Neighbours = Syn_Params['Num_Neighbours']
 beta = Syn_Params['beta']
 Wi = Syn_Params['Wi']
@@ -134,7 +134,7 @@ networkParams = {**Neuron_Params, **Syn_Params, 'Sim_Clock': defaultclock.dt, 'S
 # ### 3. Prepare the directory structure for saving the results
 
 # +
-resultPath = 'SimulationResults'
+resultPath = 'SimulationResultsFinal'
 inputStr = BrianHF.filePathGenerator('SCM_LIF_IN', networkParams).replace(" ", "")
 outputStr = BrianHF.filePathGenerator('SCM_LIF_OUT', networkParams).replace(" ", "")
 
@@ -206,7 +206,8 @@ Syn_Neurons_Neurons = Synapses(neuronsGrid, neuronsGrid,
                                ''',
                                on_pre={
                                    'pre':'incoming_spikes_post += 1; Exc_pre = Wi',
-                                   'pre_2': 'Inh_post = P_post * Wk * incoming_spikes_post'},
+                                   'pre_2': 'Inh_post += P_post * (W_Inh/incoming_spikes_post)'},
+                                #    'pre_2': 'Inh_post = P_post * Wk * incoming_spikes_post'},
                                method= 'exact',
                                namespace=Syn_Params)
 # -
@@ -251,7 +252,8 @@ BrianLogger.log_level_error()    # Only log errors to avoid excessive output
 
 warn = ''
 N = 10  # Number of runs
-run_time = simTime / N  # Duration of each run
+simTime = simTime/10
+run_time = simTime/N  # Duration of each run
 spikeTimeStamps = np.array([])
 spikeIndices = np.array([], dtype=int)
 
