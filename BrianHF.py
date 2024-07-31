@@ -296,11 +296,55 @@ def calculate_ChebyshevNeighbours(neuronsGrid, Num_Neighbours, chunk_size=1000):
         end = min((i + 1) * chunk_size, len(coords))
         chunk_coords = coords[start:end]
 
-        # Calculate the Manhattan distance between all pairs of points in the chunk
+        # Calculate the Chebyshev distance between all pairs of points in the chunk
         distances = np.max(np.abs(chunk_coords[:, None] - chunk_coords), axis=-1)
 
         # Find the pairs of points in the chunk that are within a distance of Num_Neighbours
         chunk_pairs = np.argwhere(distances <= Num_Neighbours)
+
+        # Add the chunk pairs to the list of pairs, adjusting the indices for the current chunk
+        pairs.extend((start + i, start + j) for i, j in chunk_pairs if i != j)
+
+    # Unzip the pairs into two lists
+    indexes_i, indexes_j = zip(*pairs)
+    
+    return indexes_i, indexes_j
+
+def calculate_Neighbours(neuronsGrid, Num_Neighbours, chunk_size=1000):
+    """
+    Calculate the neighbors for a given neurons grid.
+    The condition for two neurons to be considered neighbors
+    'abs(X_pre - X_post) <= num_Neighbors and abs(Y_pre - Y_post) <= num_Neighbors
+
+    Parameters:
+    neuronsGrid (NeuronsGrid): The grid of neurons.
+    Num_Neighbours (int): The maximum distance between two neurons to be considered neighbors.
+    chunk_size (int, optional): The size of each chunk to process. Defaults to 1000.
+
+    Returns:
+    tuple: A tuple containing two lists - indexes_i and indexes_j. These lists represent the pairs of neuron indexes that are considered neighbors.
+
+    """
+    # Create a list of coordinates
+    coords = np.array(list(zip(neuronsGrid.X, neuronsGrid.Y)))
+    # Initialize an empty list to store the pairs
+    pairs = []
+    # Calculate the number of chunks
+    num_chunks = len(coords) // chunk_size + (len(coords) % chunk_size != 0)
+
+    # Process each chunk
+    for i in range(num_chunks):
+        start = i * chunk_size
+        end = min((i + 1) * chunk_size, len(coords))
+        chunk_coords = coords[start:end]
+
+        # Calculate the differences in X and Y coordinates
+        diff_X = np.abs(chunk_coords[:, None, 0] - chunk_coords[:, 0])
+        diff_Y = np.abs(chunk_coords[:, None, 1] - chunk_coords[:, 1])
+
+        # Find the pairs of points in the chunk that satisfy the conditions
+        condition = (diff_X <= Num_Neighbours) & (diff_Y <= Num_Neighbours)
+        chunk_pairs = np.argwhere(condition)
 
         # Add the chunk pairs to the list of pairs, adjusting the indices for the current chunk
         pairs.extend((start + i, start + j) for i, j in chunk_pairs if i != j)

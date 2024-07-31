@@ -1,73 +1,70 @@
 import numpy as np
 import matplotlib.pyplot as plt
-plt.switch_backend('agg')
+import matplotlib.patches as patches
 
-
-def calculate_ChebyshevNeighbours(neuronsGrid, Num_Neighbours, chunk_size=1000):
-    """
-    Calculate the Chebychev neighbors for a given neurons grid.
-
-    Parameters:
-    neuronsGrid (NeuronsGrid): The grid of neurons.
-    Num_Neighbours (int): The maximum distance between two neurons to be considered neighbors.
-    chunk_size (int, optional): The size of each chunk to process. Defaults to 1000.
-
-    Returns:
-    tuple: A tuple containing two lists - indexes_i and indexes_j. These lists represent the pairs of neuron indexes that are considered neighbors.
-
-    """
+def calculate_ChebyshevNeighbours(neuronsGrid, Num_Neighbours):
     if isinstance(neuronsGrid, np.ndarray):
         coords = neuronsGrid
     else:
         # Create a list of coordinates
         coords = np.array(list(zip(neuronsGrid.X, neuronsGrid.Y)))
         
-    # Initialize an empty list to store the pairs
-    pairs = []
-    # Calculate the number of chunks
-    num_chunks = len(coords) // chunk_size + (len(coords) % chunk_size != 0)
-
-    # Process each chunk
-    for i in range(num_chunks):
-        start = i * chunk_size
-        end = min((i + 1) * chunk_size, len(coords))
-        chunk_coords = coords[start:end]
-
-        # Calculate the Manhattan distance between all pairs of points in the chunk
-        distances = np.max(np.abs(chunk_coords[:, None] - chunk_coords), axis=-1)
-
-        # Find the pairs of points in the chunk that are within a distance of Num_Neighbours
-        chunk_pairs = np.argwhere(distances <= Num_Neighbours)
-
-        # Add the chunk pairs to the list of pairs, adjusting the indices for the current chunk
-        pairs.extend((start + i, start + j) for i, j in chunk_pairs if i != j)
-
-    # Unzip the pairs into two lists
-    indexes_i, indexes_j = zip(*pairs)
-    
-    return coords, indexes_i, indexes_j
-
-def plot_neighborhood(neuronsGrid, Num_Neighbours, chunk_size=1000):
-    coords, indexes_i, indexes_j = calculate_ChebyshevNeighbours(neuronsGrid, Num_Neighbours, chunk_size)
-    
+    # Extract X and Y coordinates
     coords_X = coords[:, 0]
     coords_Y = coords[:, 1]
-    # Plot neurons
-    plt.scatter(coords_X, coords_Y, c='blue', label='Neurons')
     
-    # Draw lines between neighbors
-    for i, j in zip(indexes_i, indexes_j):
-        plt.plot([coords_X[i], coords_X[j]], [coords_Y[i], coords_Y[j]], 'r-', alpha=0.5)
+    # Find the central neuron
+    central_x, central_y = coords_X.max() // 2, coords_Y.max() // 2
     
+    # Calculate the Chebyshev distance between the central point and all points in the grid
+    distances = np.max(np.abs(np.stack((coords_X - central_x, coords_Y - central_y), axis=-1)), axis=-1)
+    
+    # Find the indexes of the N closest neighbors
+    neighbor_indexes = np.argsort(distances)[:Num_Neighbours]
+    
+    # Get the coordinates of the N closest neighbors
+    neighbor_coords = coords[neighbor_indexes]
+    return coords, neighbor_coords    
+
+
+
+def plot_neighborhood(neuronsGrid, Num_Neighbours):
+    coords, neighbor_coords = calculate_ChebyshevNeighbours(neuronsGrid, Num_Neighbours)
+    # Extract X and Y coordinates
+    coords_X = coords[:, 0]
+    coords_Y = coords[:, 1]
+     
+    # Find the central neuron
+    central_x, central_y = coords_X.max() // 2, coords_Y.max() // 2
+    
+    fig, ax = plt.subplots()
+    
+    # Plot neurons as blue squares
+    for x, y in zip(coords_X, coords_Y):
+        ax.add_patch(plt.Rectangle((x - 0.5, y - 0.5), 1, 1, edgecolor='black', facecolor='blue'))
+    
+    # Highlight the central neuron in green
+    ax.add_patch(plt.Rectangle((central_x - 0.5, central_y - 0.5), 1, 1, edgecolor='black', facecolor='green'))
+    
+    
+    # Highlight the neighbors of the central neuron in red
+    for i, j in neighbor_coords:
+        print(i, j)
+        square = patches.Rectangle((i - 0.5, j - 0.5), 1, 1, edgecolor='red', facecolor='red')
+        ax.add_patch(square)
+    
+    ax.set_aspect('equal')
+    ax.set_aspect('equal')
+    ax.set_xlim(-0.5, coords_X.max() - 0.5)
+    ax.set_ylim(-0.5, coords_Y.max() - 0.5)
     plt.xlabel('X Coordinate')
     plt.ylabel('Y Coordinate')
     plt.title('Neuron Neighborhood')
-    plt.legend()
     plt.show()
-
+    
 if __name__ == '__main__':
     # Create a simple NeuronsGrid object
-    NeuronsGrid = np.array([[0, 0], [1, 0], [0, 1], [1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], [7, 7]])
+    NeuronsGrid = np.array([[i, j] for i in range(12) for j in range(12)])
     Num_Neighbours = 2
     
     plot_neighborhood(NeuronsGrid, Num_Neighbours)
