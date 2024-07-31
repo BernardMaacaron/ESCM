@@ -117,7 +117,6 @@ def clear_duplicates(times, indices):
 def nudge_ts(ts, nudge=1e-6):
     return None
 
-
 def IST_sampler(interSpikeTiming, firing_x, firing_y, times):
     """
     Selects spikes with an inter-spike timing difference greater than or equal to a given value.
@@ -265,6 +264,8 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
         dt = clockStep
     
     return simTime, clockStep, SpikeGeneratorGroup(num_neurons, indices.astype(int), times*ms, dt, sorted=True)
+'''=========================================================================================================================='''
+
 
 
 
@@ -308,7 +309,7 @@ def calculate_ChebyshevNeighbours(neuronsGrid, Num_Neighbours, chunk_size=1000):
     indexes_i, indexes_j = zip(*pairs)
     
     return indexes_i, indexes_j
-
+'''=========================================================================================================================='''
 
 
 
@@ -488,7 +489,7 @@ def visualise_interSpikeInterval(spikeMonitor, neuron_indices ,figSize=(10, 5)):
         ylabel('Inter-Spike Interval (ms)')
         title(f'Inter-Spike Interval for Neuron {neuron_index}')
         show()
-
+'''=========================================================================================================================='''
 
 
 
@@ -662,8 +663,9 @@ def generate_videoFrame (frame, width, height):
     binary_frame = np.uint8(frame * 254)
     # Reshape the frame to match the desired width and height
     binary_frame = cv2.resize(binary_frame, (width+1, height+1), interpolation=cv2.INTER_CUBIC)
-    return binary_frame
     
+    return binary_frame
+
 # Generate a binary video from the frames (normally generated using generate_InOut_frames())
 # XXX: Currently I suppose the videos generated will have different lengths. Evaluate if i need to compare the timestamps for input and output.
 def generate_video(frames, output_path, simTime: float):
@@ -703,7 +705,7 @@ def generate_YarpDvs(spikeMon_time, spikeMon_index, NeuronGroup, path):
     data = {'ts': spikeMon_time, 'x': x_list, 'y': y_list, 'pol': ones(len(spikeMon_time), dtype=int)}
     with open(path, 'wb') as dataFile:
         exportIitYarp.exportDvs(dataFile, data, bottleNumber=0)
-        
+'''=========================================================================================================================='''
 
 
 
