@@ -261,7 +261,7 @@ def event_to_spike(eventStream, width, height, dt=None, val_indices=False, clear
     print(f'The recommended clock time step (scaled) is {clockStep} ms.')
     
     if dt is None:
-        dt = clockStep
+        dt = clockStep*ms
     
     return simTime, clockStep, SpikeGeneratorGroup(num_neurons, indices.astype(int), times*ms, dt, sorted=True)
 '''=========================================================================================================================='''

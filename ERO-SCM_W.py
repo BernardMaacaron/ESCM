@@ -93,7 +93,7 @@ GenerateInputVisuals = False
 GenerateOutputVisuals = False
 
 simTime, clockStep, inputSpikesGen = BrianHF.event_to_spike(eventStream, grid_width, grid_height,
-                                                            dt = defaultclock.dt, timeScale = 1.0, samplePercentage=samplePerc, interSpikeTiming=None)
+                                                            dt = None, timeScale = 1/10.0, samplePercentage=samplePerc, interSpikeTiming=None)
 # defaultclock.dt = clockStep*ms
 print("Input event stream successfully converted to spike trains\n")
 # -
@@ -121,7 +121,7 @@ Eqs_Neurons = NeuronEquations.EQ_SCM_IF    # Neurons Equation
 Neighborhood Size (num_Neighbors) - Affects the number of neighbors a central neuron based on the L1 Distance
 Neighboring Neurons --> (abs(X_pre - X_post) <= Num_Neighbours  and abs(Y_pre - Y_post) <= Num_Neighbours)
 '''
-Syn_Params = {'Num_Neighbours' : 20, 'beta': 0.5, 'Wi': 6.0, 'Wk': -0.5, 'method_Syn': 'exact'}
+Syn_Params = {'Num_Neighbours' : 8, 'beta': 0.5, 'Wi': 6.0, 'Wk': -3.0, 'method_Syn': 'exact'}
 Num_Neighbours = Syn_Params['Num_Neighbours']
 beta = Syn_Params['beta']
 Wi = Syn_Params['Wi']
@@ -136,7 +136,7 @@ networkParams = {**Neuron_Params, **Syn_Params, 'Sim_Clock': defaultclock.dt, 'S
 # +
 resultPath = 'SimulationResultsFinal'
 inputStr = BrianHF.filePathGenerator('SCM_LIF_IN', networkParams).replace(" ", "")
-outputStr = BrianHF.filePathGenerator('SCM_LIF_OUT', networkParams).replace(" ", "")
+outputStr = BrianHF.filePathGenerator('SCM_LIF_OUT_NEIGHBORS', networkParams).replace(" ", "")
 
 # Create the folder if it doesn't exist
 if not os.path.exists(resultPath):
@@ -206,8 +206,9 @@ Syn_Neurons_Neurons = Synapses(neuronsGrid, neuronsGrid,
                                ''',
                                on_pre={
                                    'pre':'incoming_spikes_post += 1; Exc_pre = Wi',
-                                   'pre_2': 'Inh_post += P_post * (W_Inh/incoming_spikes_post)'},
-                                #    'pre_2': 'Inh_post = P_post * Wk * incoming_spikes_post'},
+                                   #'pre_2': 'Inh_post = P_post * (Wk/incoming_spikes_post)'},
+                                   #'pre_2': 'Inh_post += P_post * (Wk/incoming_spikes_post)'},
+                                   'pre_2': 'Inh_post = P_post * Wk * incoming_spikes_post'},
                                method= 'exact',
                                namespace=Syn_Params)
 # -
@@ -225,7 +226,9 @@ The code below is a faster implementation of:
     Syn_Neurons_Neurons.connect(condition='i != j and abs(X_pre - X_post) <= Num_Neighbours and abs(Y_pre - Y_post) <= Num_Neighbours')
 '''
 
-indexes_i, indexes_j = BrianHF.calculate_ChebyshevNeighbours(neuronsGrid, Num_Neighbours)
+# indexes_i, indexes_j = BrianHF.calculate_ChebyshevNeighbours(neuronsGrid, Num_Neighbours)
+indexes_i, indexes_j = BrianHF.calculate_Neighbours(neuronsGrid, Num_Neighbours)
+
 Syn_Neurons_Neurons.connect(i=indexes_i, j=indexes_j)
 Syn_Neurons_Neurons.Wi = Wi
 Syn_Neurons_Neurons.Wk = Wk
@@ -252,7 +255,7 @@ BrianLogger.log_level_error()    # Only log errors to avoid excessive output
 
 warn = ''
 N = 10  # Number of runs
-simTime = simTime/10
+# simTime = simTime/10
 run_time = simTime/N  # Duration of each run
 spikeTimeStamps = np.array([])
 spikeIndices = np.array([], dtype=int)
