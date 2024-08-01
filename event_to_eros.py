@@ -91,10 +91,12 @@ def process(data_dvs_file, output_path, skip=None, args=None):
         if args['write_images']:
             cv2.imwrite(os.path.join(output_path, f'{filename}_{fi:04d}.jpg'), frame)
         if args['write_video']:
-            video_out.write(frame)
-            print('writing')
+            
+            framergb = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+            video_out.write(framergb)
 
     if args['write_video']:
+        print('writing')
         video_out.release()
 
     return
@@ -131,8 +133,8 @@ def main():
     skip_image = None
     input_data_dir = 'InputData'
     output_base_path = 'EROS'
-    write_images = True
-    write_video = False
+    write_images = False
+    write_video = True
     frame_length = 30 #ms
     interval_length = 1000 #ms
     fps = interval_length/frame_length
@@ -145,7 +147,7 @@ def main():
     input_data_dir = os.path.abspath(input_data_dir)
     
     datasets = ['DHP19_Sample', 'EyeTracking', 'h36m_sample', 'MVSEC_short_outdoor']
-    datasets = ['MVSEC_short_outdoor']
+    datasets = ['EyeTracking', 'h36m_sample','MVSEC_short_outdoor']
 
     for dataset in datasets:
         input_data_dir = os.path.join(input_data_dir, dataset)

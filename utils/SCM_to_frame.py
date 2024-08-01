@@ -30,20 +30,12 @@ def process(data_dvs_file, output_path, skip=None, args=None):
 
     print('Importing file...', data_dvs_file)
     data_dvs = importAe(filePathOrName=data_dvs_file)
-    # data_dvs = import_dvs(filePathOrName=data_dvs_file)
     print('File imported.')
-    # data_dvs = importIitYarpBinaryDataLog(filePathOrName=data_dvs_file)
-    
-    # try:
-    #     data_dvs['data']['left']['dvs']['ts'] /= args['ts_scaler']
-    #     side = 'left'
-    # except KeyError:
-    #     data_dvs['data']['right']['dvs']['ts'] /= args['ts_scaler']
-    #     side = 'right'
+
         
     data_dvs = next(BrianHF.find_keys(data_dvs, 'dvs'))
     data_ts = create_ts_list(args['fps'],data_dvs['ts'])
-    # print(f"{data_dvs_file.split('/')[-3:-1]}: \n start: {data_dvs['data'][side]['dvs']['ts'][0]} \n stop: {data_dvs['data'][side]['dvs']['ts'][-1]}")
+    
     print(f"{data_dvs_file.split('/')[-3]}: \n start: {(-1)*data_dvs['tsOffset']} \n duration: {data_dvs['ts'][-1]}")
     iterator = batchIterator(data_dvs, data_ts)
     
