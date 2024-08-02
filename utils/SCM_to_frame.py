@@ -6,8 +6,14 @@ import sys
 import glob
 import os
 
-# Get the directory of the current script
+# Find the ERO-SNN folder and add it to the python path
 current_dir = os.getcwd()
+
+while os.path.basename(current_dir) != 'ERO-SNN':
+    print(os.path.basename(current_dir))
+    current_dir = os.path.dirname(current_dir)
+    
+print(f"Found ERO-SNN folder: {current_dir}")
 sys.path.append(current_dir)
 
 import BrianHF
@@ -41,7 +47,7 @@ def process(data_dvs_file, output_path, skip=None, args=None):
     data_dvs = next(BrianHF.find_keys(data_dvs, 'dvs'))
     data_ts = create_ts_list(args['fps'],data_dvs['ts'])
     
-    print(f"{data_dvs_file.split('/')[-3]}: \n start: {(-1)*data_dvs['tsOffset']} \n duration: {data_dvs['ts'][-1]}")
+    print(f"{data_dvs_file.split('/')[-3]}: \n start: {(-1)*data_dvs['tsOffset']} \n duration: {data_dvs['ts'][-1]} \n scaled duration: {data_ts['ts'][-1]}")
     iterator = batchIterator(data_dvs, data_ts)
     
     frame_width = np.max(data_dvs['x'])+1
@@ -122,7 +128,7 @@ def main():
     input_data_dir = os.path.abspath(input_data_dir)
     
     datasets = ['DHP19_Sample', 'EyeTracking', 'h36m_sample', 'MVSEC_short_outdoor']
-    datasets = ['h36m_sample', 'MVSEC_short_outdoor']
+    datasets = ['EyeTracking']
 
     for dataset in datasets:
         input_data_dir = os.path.join(input_data_dir, dataset)
