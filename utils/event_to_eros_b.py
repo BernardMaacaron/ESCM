@@ -9,6 +9,7 @@ import glob
 #
 # from lib import init, MoveNet, Task
 
+# +
 # Find the ERO-SNN folder and add it to the python path
 current_dir = os.getcwd()
 
@@ -18,15 +19,16 @@ while os.path.basename(current_dir) != 'ERO-SNN':
     
 print(f"Found ERO-SNN folder: {current_dir}")
 sys.path.append(current_dir)
-    
-import BrianHF
+# -
 
+import BrianHF
 from datasets.utils.parsing import import_yarp_skeleton_data, batchIterator
 from datasets.utils.events_representation import EROS
 from datasets.utils.export import ensure_location, str2bool #, get_movenet_keypoints, get_center
 from bimvee.importIitYarp import importIitYarp as import_dvs
 from bimvee.importAe import importAe
 from bimvee.importIitYarp import importIitYarpBinaryDataLog
+
 
 def create_ts_list(fps,ts):
     out = dict()
@@ -65,11 +67,11 @@ def process(data_dvs_file, output_path, skip=None, args=None):
     frame_width = np.max(data_dvs['x'])+1
     frame_height = np.max(data_dvs['y'])+1
     
-    eros = EROS(kernel_size=args['eros_kernel'], frame_width=frame_width, frame_height=frame_height)
+    eros = EROS(kernel_size=args['eros_kernel'], frame_width=frame_width, frame_height=frame_height, decay_base=0.0)
 
     poses_movenet = []
     if args['write_video']:
-        output_path_video = os.path.join(output_path,'eros-out.mp4')
+        output_path_video = os.path.join(output_path,'eros-binary-out.mp4')
         print(output_path_video)
         video_out = cv2.VideoWriter(output_path_video, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), args['fps'],
                                     (frame_width, frame_height))
@@ -147,11 +149,11 @@ def main():
     output_base_path = 'EROS'
     write_images = False
     write_video = True
-    frame_length = 1 #ms
-    interval_length = 30 #ms
+    frame_length = 30 #ms
+    interval_length = 1000 #ms
     fps = interval_length/frame_length
     dev = False
-    ts_scaler = 1
+    ts_scaler = 0.1
     
     # Ensure the base output path exists
     output_base_path = os.path.abspath(output_base_path)
@@ -159,7 +161,7 @@ def main():
     input_data_dir = os.path.abspath(input_data_dir)
     
     datasets = ['DHP19_Sample', 'EyeTracking', 'h36m_sample', 'MVSEC_short_outdoor']
-    datasets = ['EyeTracking']
+    datasets = ['MVSEC_short_outdoor']
 
     for dataset in datasets:
         input_data_dir = os.path.join(input_data_dir, dataset)

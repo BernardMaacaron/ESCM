@@ -116,8 +116,8 @@ def main():
     output_base_path = 'EROS_like'
     write_images = False
     write_video = True
-    frame_length = 30 #ms
-    interval_length = 1000 #ms
+    frame_length = 1 #ms
+    interval_length = 30 #ms
     fps = interval_length/frame_length
     dev = False
     ts_scaler = 1.0
@@ -128,7 +128,7 @@ def main():
     input_data_dir = os.path.abspath(input_data_dir)
     
     datasets = ['DHP19_Sample', 'EyeTracking', 'h36m_sample', 'MVSEC_short_outdoor']
-    datasets = ['EyeTracking']
+    datasets = ['h36m_sample']
 
     for dataset in datasets:
         input_data_dir = os.path.join(input_data_dir, dataset)
