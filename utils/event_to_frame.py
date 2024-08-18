@@ -116,7 +116,7 @@ def process(data_dvs_file, output_path, skip=None, args=None):
             images_path =  os.path.join(output_path,'Images')
             ensure_location(images_path)
             path = os.path.join(images_path, f'frame_{fi:08d}.jpg')
-            sys.stdout.write("Saving image to " + path + "\r")
+            # sys.stdout.write("Saving image to " + path + "\r")
             cv2.imwrite(path, frame)
             
         if args['write_video']:

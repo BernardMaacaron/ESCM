@@ -46,7 +46,7 @@ def create_ts_list(frame_length, frame_interval, ts):
         
         # Collect all timestamps within this window
         window_ts = ts[start_idx:end_idx]
-        out['ts'].extend(window_ts)
+        out['ts'].append(window_ts)
     
     return out
 
@@ -64,6 +64,13 @@ def process(data_dvs_file, output_path, skip=None, args=None):
 
         
     data_dvs = next(BrianHF.find_keys(data_dvs, 'dvs'))
+    # Check if the timestamps are in order
+    print("The current type of the timestamps is:" , type(data_dvs['ts']))
+    data_dvs['ts'] = np.array(data_dvs['ts'])
+    if not np.all(np.diff(data_dvs['ts']) > 0):
+        print("Timestamps are not in order")
+        return False
+    
     data_ts = create_ts_list(args['frame_length'], args['interval_length'], data_dvs['ts'])
     
     print(f"{data_dvs_file.split('/')[-3]}: \n start: {(-1)*data_dvs['tsOffset']} \n duration: {data_dvs['ts'][-1]} \n scaled duration: {data_ts['ts'][-1]}")
@@ -80,47 +87,48 @@ def process(data_dvs_file, output_path, skip=None, args=None):
     print(f"FPS: {args['fps']}")
 
     
-    if args['write_video']:
-        output_path_video = os.path.join(output_path,'scm-out.mp4')
-        print(output_path_video)
-        video_out = cv2.VideoWriter(output_path_video, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), args['fps'],
-                                    (frame_width, frame_height))
+    # if args['write_video']:
+    #     output_path_video = os.path.join(output_path,'scm-out.mp4')
+    #     print(output_path_video)
+    #     video_out = cv2.VideoWriter(output_path_video, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), args['fps'],
+    #                                 (frame_width, frame_height))
 
 
-    for fi, (events, pose, batch_size) in enumerate(iterator):
-        sys.stdout.write(f'frame: {fi}/{len(data_ts["ts"])}\r')
-        sys.stdout.flush()
+    # for fi, (events, pose, batch_size) in enumerate(iterator):
+    #     sys.stdout.write(f'frame: {fi}/{len(data_ts["ts"])}\r')
+    #     sys.stdout.flush()
 
 
-        frame = np.zeros((frame_height, frame_width), dtype=np.uint8)
+    #     frame = np.zeros((frame_height, frame_width), dtype=np.uint8)
 
 
-        for ei in range(batch_size):                
-            vx=int(events['x'][ei])
-            vy=int(events['y'][ei])
-            frame[vy,vx] = 255
+    #     for ei in range(batch_size):                
+    #         vx=int(events['x'][ei])
+    #         vy=int(events['y'][ei])
+    #         frame[vy,vx] = 255
         
             
-        if fi % skip != 0:
-            continue
+    #     if fi % skip != 0:
+    #         continue
 
-        filename = os.path.basename(data_dvs_file)
+    #     filename = os.path.basename(data_dvs_file)
         
-        if args['write_images']:
-            images_path =  os.path.join(output_path,'Images')
-            ensure_location(images_path)
-            path = os.path.join(images_path, f'frame_{fi:08d}.jpg')
-            sys.stdout.write("Saving image to " + path + "\r")
-            cv2.imwrite(path, frame)
+    #     if args['write_images']:
+    #         images_path =  os.path.join(output_path,'Images')
+    #         ensure_location(images_path)
+    #         path = os.path.join(images_path, f'frame_{fi:08d}.jpg')
+    #         sys.stdout.write("Saving image to " + path + "\r")
+    #         cv2.imwrite(path, frame)
             
-        if args['write_video']:
-            framergb = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
-            video_out.write(frame)
+    #     if args['write_video']:
+    #         framergb = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+    #         video_out.write(frame)
 
-    if args['write_video']:
-        video_out.release()
+    # if args['write_video']:
+    #     video_out.release()
 
     return
+
 
 def find_data_log_files(base_dirs):
     data_log_files = []
@@ -141,7 +149,7 @@ write_images = True
 write_video = False
 frame_length = 1.1 #ms
 interval_length = 30 #ms
-fps = interval_length/frame_length
+fps = 610
 dev = False
 ts_scaler = 1.0
 
