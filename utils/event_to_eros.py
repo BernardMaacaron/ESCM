@@ -273,7 +273,7 @@ def setup_testing_list(path):
 
 # +
 # Define the variables directly
-eros_kernel = 8
+eros_kernel = 4
 skip_image = None
 input_data_dir = 'InputData'
 output_base_path = 'EROS'
