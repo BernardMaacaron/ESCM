@@ -4,7 +4,7 @@ Welcome to the ERO-SNN project!
 
 ## Introduction
 
-ERO-SNN is a software library for implementing Event-Driven Recurrent Spiking Neural Networks (SNNs) using [Brian2](https://brian2.readthedocs.io/en/stable/). It provides a flexible and efficient framework for simulating and training spiking cortical models using event-based data.
+This repository holds the implementation of the Event-Driven Spiking Cortical Model for persistent and velocity-invariant event camera output representation using [Brian2](https://brian2.readthedocs.io/en/stable/). It provides a flexible and efficient framework for simulating and training spiking cortical models using event-based data.
 
 ## Features
 
